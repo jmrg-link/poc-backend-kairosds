@@ -1,0 +1,16 @@
+.vscode
+.sfdx
+.env
+
+/dist
+/node_modules
+
+/scripts/init-mongo.js
+/data/traefik/acme/acme.json
+
+store/images/*
+!store/images/.gitkeep
+logs/traefik/*
+!logs/traefik/.gitkeep
+
+/coverage
