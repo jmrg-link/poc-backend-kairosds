@@ -1,0 +1,3311 @@
+{
+	"info": {
+		"_postman_id": "50b65fd0-38fa-4d33-8376-4e862f4cc9cc",
+		"name": "Image Processing API",
+		"description": "- **API REST para procesamiento de imágenes con sistema de jobs , events con bullmq parallel processing**\n- **Arquitectura híbrida Clean Architecture + CQRS + Event-Driven** para el procesamiento asíncrono de imágenes\n\n\nContact Support:\n Name: FullStack React - Backend Senior JMRG\n Email: info@jmrg.dev",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "20612786"
+	},
+	"item": [
+		{
+			"name": "tasks",
+			"item": [
+				{
+					"name": "upload",
+					"item": [
+						{
+							"name": "Crear tarea con upload directo",
+							"request": {
+								"auth": {
+									"type": "apikey",
+									"apikey": [
+										{
+											"key": "key",
+											"value": "X-API-Key",
+											"type": "string"
+										},
+										{
+											"key": "value",
+											"value": "{{apiKey}}",
+											"type": "string"
+										},
+										{
+											"key": "in",
+											"value": "header",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-Idempotency-Key",
+										"value": "123e4567-e89b-12d3-a456-426614174000",
+										"description": "**Clave de idempotencia** para operaciones de escritura.\n\nPreviene la creación duplicada de tareas al reintentar requests.\nSe recomienda usar UUIDs únicos por operación.\n"
+									},
+									{
+										"key": "Content-Type",
+										"value": "multipart/form-data"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "image",
+											"contentType": "image/jpeg, image/png, image/webp",
+											"description": "(Required) **Archivo de imagen a procesar**\n\n- Formatos: JPEG, PNG, WebP\n- Tamaño máximo: 10MB\n- Resolución recomendada: Mínimo 800px de ancho\n",
+											"type": "file",
+											"src": []
+										}
+									]
+								},
+								"url": {
+									"raw": "{{baseUrl}}/tasks/upload",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"tasks",
+										"upload"
+									]
+								},
+								"description": "**Endpoint especializado** para creación de tareas mediante upload directo de archivos.\n\n### Características\n- **Solo multipart/form-data**: Optimizado para uploads\n- **Validación estricta**: Tipo MIME, tamaño, formato\n- **Procesamiento inmediato**: Sin descarga adicional\n- **Performance**: Más rápido que el endpoint genérico\n\n### Validaciones Multer\n- **Tipos permitidos**: image/jpeg, image/png, image/webp\n- **Tamaño máximo**: 10MB (10,485,760 bytes)\n- **Archivos**: Solo 1 archivo por request\n- **Campo**: Debe llamarse 'image'\n"
+							},
+							"response": [
+								{
+									"name": "Tarea creada exitosamente desde upload",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"key": "X-Idempotency-Key",
+												"value": "123e4567-e89b-12d3-a456-426614174000",
+												"description": "**Clave de idempotencia** para operaciones de escritura.\n\nPreviene la creación duplicada de tareas al reintentar requests.\nSe recomienda usar UUIDs únicos por operación.\n"
+											},
+											{
+												"key": "Content-Type",
+												"value": "multipart/form-data"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "X-API-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"body": {
+											"mode": "formdata",
+											"formdata": [
+												{
+													"key": "image",
+													"contentType": "image/jpeg, image/png, image/webp",
+													"description": "(Required) **Archivo de imagen a procesar**\n\n- Formatos: JPEG, PNG, WebP\n- Tamaño máximo: 10MB\n- Resolución recomendada: Mínimo 800px de ancho\n",
+													"type": "file",
+													"src": []
+												}
+											]
+										},
+										"url": {
+											"raw": "{{baseUrl}}/tasks/upload",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"tasks",
+												"upload"
+											]
+										}
+									},
+									"status": "Created",
+									"code": 201,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"taskId\": \"65d4a54b89c5e342b2c2c5f6\",\n  \"status\": \"pending\",\n  \"price\": 35\n}"
+								},
+								{
+									"name": "Archivo requerido",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"key": "X-Idempotency-Key",
+												"value": "123e4567-e89b-12d3-a456-426614174000",
+												"description": "**Clave de idempotencia** para operaciones de escritura.\n\nPreviene la creación duplicada de tareas al reintentar requests.\nSe recomienda usar UUIDs únicos por operación.\n"
+											},
+											{
+												"key": "Content-Type",
+												"value": "multipart/form-data"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "X-API-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"body": {
+											"mode": "formdata",
+											"formdata": [
+												{
+													"key": "image",
+													"contentType": "image/jpeg, image/png, image/webp",
+													"description": "(Required) **Archivo de imagen a procesar**\n\n- Formatos: JPEG, PNG, WebP\n- Tamaño máximo: 10MB\n- Resolución recomendada: Mínimo 800px de ancho\n",
+													"type": "file",
+													"src": []
+												}
+											]
+										},
+										"url": {
+											"raw": "{{baseUrl}}/tasks/upload",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"tasks",
+												"upload"
+											]
+										}
+									},
+									"status": "Bad Request",
+									"code": 400,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"FILE_REQUIRED\",\n  \"message\": \"Se requiere un archivo de imagen\",\n  \"statusCode\": 400\n}"
+								},
+								{
+									"name": "Tipo inválido",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"key": "X-Idempotency-Key",
+												"value": "123e4567-e89b-12d3-a456-426614174000",
+												"description": "**Clave de idempotencia** para operaciones de escritura.\n\nPreviene la creación duplicada de tareas al reintentar requests.\nSe recomienda usar UUIDs únicos por operación.\n"
+											},
+											{
+												"key": "Content-Type",
+												"value": "multipart/form-data"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "X-API-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"body": {
+											"mode": "formdata",
+											"formdata": [
+												{
+													"key": "image",
+													"contentType": "image/jpeg, image/png, image/webp",
+													"description": "(Required) **Archivo de imagen a procesar**\n\n- Formatos: JPEG, PNG, WebP\n- Tamaño máximo: 10MB\n- Resolución recomendada: Mínimo 800px de ancho\n",
+													"type": "file",
+													"src": []
+												}
+											]
+										},
+										"url": {
+											"raw": "{{baseUrl}}/tasks/upload",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"tasks",
+												"upload"
+											]
+										}
+									},
+									"status": "Bad Request",
+									"code": 400,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"INVALID_FILE_TYPE\",\n  \"message\": \"Tipo de archivo no soportado. Solo se permiten: JPEG, PNG, WebP\",\n  \"statusCode\": 400\n}"
+								},
+								{
+									"name": "**Archivo demasiado grande**\n\nEl archivo subido excede el límite de 10MB configurado en Multer.\n",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"key": "X-Idempotency-Key",
+												"value": "123e4567-e89b-12d3-a456-426614174000",
+												"description": "**Clave de idempotencia** para operaciones de escritura.\n\nPreviene la creación duplicada de tareas al reintentar requests.\nSe recomienda usar UUIDs únicos por operación.\n"
+											},
+											{
+												"key": "Content-Type",
+												"value": "multipart/form-data"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "X-API-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"body": {
+											"mode": "formdata",
+											"formdata": [
+												{
+													"key": "image",
+													"contentType": "image/jpeg, image/png, image/webp",
+													"description": "(Required) **Archivo de imagen a procesar**\n\n- Formatos: JPEG, PNG, WebP\n- Tamaño máximo: 10MB\n- Resolución recomendada: Mínimo 800px de ancho\n",
+													"type": "file",
+													"src": []
+												}
+											]
+										},
+										"url": {
+											"raw": "{{baseUrl}}/tasks/upload",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"tasks",
+												"upload"
+											]
+										}
+									},
+									"status": "Request Entity Too Large",
+									"code": 413,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"FILE_TOO_LARGE\",\n  \"message\": \"El archivo excede el tamaño máximo de 10MB\",\n  \"statusCode\": 413\n}"
+								},
+								{
+									"name": "**Error interno del servidor**\n\nError inesperado en el sistema. Contacte al administrador si persiste.\n",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"key": "X-Idempotency-Key",
+												"value": "123e4567-e89b-12d3-a456-426614174000",
+												"description": "**Clave de idempotencia** para operaciones de escritura.\n\nPreviene la creación duplicada de tareas al reintentar requests.\nSe recomienda usar UUIDs únicos por operación.\n"
+											},
+											{
+												"key": "Content-Type",
+												"value": "multipart/form-data"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "X-API-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"body": {
+											"mode": "formdata",
+											"formdata": [
+												{
+													"key": "image",
+													"contentType": "image/jpeg, image/png, image/webp",
+													"description": "(Required) **Archivo de imagen a procesar**\n\n- Formatos: JPEG, PNG, WebP\n- Tamaño máximo: 10MB\n- Resolución recomendada: Mínimo 800px de ancho\n",
+													"type": "file",
+													"src": []
+												}
+											]
+										},
+										"url": {
+											"raw": "{{baseUrl}}/tasks/upload",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"tasks",
+												"upload"
+											]
+										}
+									},
+									"status": "Internal Server Error",
+									"code": 500,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"INTERNAL_SERVER_ERROR\",\n  \"message\": \"Ocurrió un error inesperado en el servidor\",\n  \"statusCode\": 500\n}"
+								}
+							]
+						}
+					]
+				},
+				{
+					"name": "{taskId}",
+					"item": [
+						{
+							"name": "retry",
+							"item": [
+								{
+									"name": "Reintentar tarea fallida",
+									"request": {
+										"auth": {
+											"type": "apikey",
+											"apikey": [
+												{
+													"key": "key",
+													"value": "X-API-Key",
+													"type": "string"
+												},
+												{
+													"key": "value",
+													"value": "{{apiKey}}",
+													"type": "string"
+												},
+												{
+													"key": "in",
+													"value": "header",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/tasks/:taskId/retry",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"tasks",
+												":taskId",
+												"retry"
+											],
+											"variable": [
+												{
+													"key": "taskId",
+													"value": "65d4a54b89c5e342b2c2c5f6",
+													"description": "(Required) **Identificador único de tarea**\n\nObjectId de MongoDB en formato hexadecimal de 24 caracteres.\n"
+												}
+											]
+										},
+										"description": "**Reintenta el procesamiento** de una tarea que ha fallado previamente.\n\n### Requisitos\n- La tarea debe existir\n- Estado actual debe ser 'failed'\n- El archivo original debe estar disponible\n\n### Proceso\n1. Valida que la tarea esté en estado 'failed'\n2. Cambia estado a 'pending'\n3. Re-encola la tarea con la misma configuración\n4. Mantiene el mismo precio original\n\n### Limitaciones\n- Solo tareas en estado 'failed' pueden reintentarse\n- El precio original se mantiene\n- Los archivos procesados previamente se sobrescriben\n"
+									},
+									"response": [
+										{
+											"name": "Tarea re-encolada exitosamente",
+											"originalRequest": {
+												"method": "POST",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/json"
+													},
+													{
+														"key": "X-API-Key",
+														"value": "<API Key>",
+														"description": "Added as a part of security scheme: apikey"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/tasks/:taskId/retry",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"tasks",
+														":taskId",
+														"retry"
+													],
+													"variable": [
+														{
+															"key": "taskId"
+														}
+													]
+												}
+											},
+											"status": "OK",
+											"code": 200,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"taskId\": \"65d4a54b89c5e342b2c2c5f6\",\n  \"status\": \"pending\",\n  \"price\": 25.5,\n  \"createdAt\": \"2024-06-01T12:00:00Z\",\n  \"updatedAt\": \"2024-06-01T12:15:00Z\"\n}"
+										},
+										{
+											"name": "Estado inválido para retry",
+											"originalRequest": {
+												"method": "POST",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/json"
+													},
+													{
+														"key": "X-API-Key",
+														"value": "<API Key>",
+														"description": "Added as a part of security scheme: apikey"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/tasks/:taskId/retry",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"tasks",
+														":taskId",
+														"retry"
+													],
+													"variable": [
+														{
+															"key": "taskId"
+														}
+													]
+												}
+											},
+											"status": "Bad Request",
+											"code": 400,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"error\": \"INVALID_RETRY_STATE\",\n  \"message\": \"Solo se pueden reintentar tareas fallidas. Estado actual: completed\",\n  \"statusCode\": 400\n}"
+										},
+										{
+											"name": "**Recurso no encontrado**\n\nLa tarea solicitada no existe en la base de datos.\n",
+											"originalRequest": {
+												"method": "POST",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/json"
+													},
+													{
+														"key": "X-API-Key",
+														"value": "<API Key>",
+														"description": "Added as a part of security scheme: apikey"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/tasks/:taskId/retry",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"tasks",
+														":taskId",
+														"retry"
+													],
+													"variable": [
+														{
+															"key": "taskId"
+														}
+													]
+												}
+											},
+											"status": "Not Found",
+											"code": 404,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"error\": \"TASK_NOT_FOUND\",\n  \"message\": \"La tarea con ID 65d4a54b89c5e342b2c2c5f6 no existe\",\n  \"statusCode\": 404\n}"
+										},
+										{
+											"name": "**Error interno del servidor**\n\nError inesperado en el sistema. Contacte al administrador si persiste.\n",
+											"originalRequest": {
+												"method": "POST",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/json"
+													},
+													{
+														"key": "X-API-Key",
+														"value": "<API Key>",
+														"description": "Added as a part of security scheme: apikey"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/tasks/:taskId/retry",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"tasks",
+														":taskId",
+														"retry"
+													],
+													"variable": [
+														{
+															"key": "taskId"
+														}
+													]
+												}
+											},
+											"status": "Internal Server Error",
+											"code": 500,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"error\": \"INTERNAL_SERVER_ERROR\",\n  \"message\": \"Ocurrió un error inesperado en el servidor\",\n  \"statusCode\": 500\n}"
+										}
+									]
+								}
+							]
+						},
+						{
+							"name": "Obtener detalles de una tarea",
+							"request": {
+								"auth": {
+									"type": "apikey",
+									"apikey": [
+										{
+											"key": "key",
+											"value": "X-API-Key",
+											"type": "string"
+										},
+										{
+											"key": "value",
+											"value": "{{apiKey}}",
+											"type": "string"
+										},
+										{
+											"key": "in",
+											"value": "header",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/tasks/:taskId",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"tasks",
+										":taskId"
+									],
+									"variable": [
+										{
+											"key": "taskId",
+											"value": "65d4a54b89c5e342b2c2c5f6",
+											"description": "(Required) **Identificador único de tarea**\n\nObjectId de MongoDB en formato hexadecimal de 24 caracteres.\n"
+										}
+									]
+								},
+								"description": "Consulta el **estado actual y detalles** de una tarea específica.\n\n### Estados Posibles\n- **pending**: Tarea creada, esperando procesamiento\n- **processing**: Worker está procesando la imagen\n- **completed**: Procesamiento finalizado con éxito\n- **failed**: Error durante el procesamiento\n\n### Información Incluida\n- **Estado actual** y timestamps\n- **Precio asignado** (aleatorio 5-50)\n- **Imágenes procesadas** (solo si completed)\n- **Error detallado** (solo si failed)\n\n### Paths de Imágenes\nLas imágenes procesadas siguen el patrón:\n`/storage/images/{taskId}/{resolution}/{md5}.{ext}`\n"
+							},
+							"response": [
+								{
+									"name": "Tarea pendiente",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "X-API-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/tasks/:taskId",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"tasks",
+												":taskId"
+											],
+											"variable": [
+												{
+													"key": "taskId"
+												}
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"taskId\": \"65d4a54b89c5e342b2c2c5f6\",\n  \"status\": \"pending\",\n  \"price\": 25.5,\n  \"createdAt\": \"2024-06-01T12:00:00Z\",\n  \"updatedAt\": \"2024-06-01T12:00:00Z\"\n}"
+								},
+								{
+									"name": "Tarea en procesamiento",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "X-API-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/tasks/:taskId",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"tasks",
+												":taskId"
+											],
+											"variable": [
+												{
+													"key": "taskId"
+												}
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"taskId\": \"65d4a54b89c5e342b2c2c5f6\",\n  \"status\": \"processing\",\n  \"price\": 25.5,\n  \"createdAt\": \"2024-06-01T12:00:00Z\",\n  \"updatedAt\": \"2024-06-01T12:05:00Z\"\n}"
+								},
+								{
+									"name": "Tarea completada",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "X-API-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/tasks/:taskId",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"tasks",
+												":taskId"
+											],
+											"variable": [
+												{
+													"key": "taskId"
+												}
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"taskId\": \"65d4a54b89c5e342b2c2c5f6\",\n  \"status\": \"completed\",\n  \"price\": 25.5,\n  \"images\": [\n    {\n      \"resolution\": \"1024\",\n      \"path\": \"/output/image1/1024/f322b730b287da77e1c519c7ffef4fc2.jpg\"\n    },\n    {\n      \"resolution\": \"800\",\n      \"path\": \"/output/image1/800/202fd8b3174a774bac24428e8cb230a1.jpg\"\n    }\n  ],\n  \"createdAt\": \"2024-06-01T12:00:00Z\",\n  \"updatedAt\": \"2024-06-01T12:10:00Z\"\n}"
+								},
+								{
+									"name": "Tarea fallida",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "X-API-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/tasks/:taskId",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"tasks",
+												":taskId"
+											],
+											"variable": [
+												{
+													"key": "taskId"
+												}
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"taskId\": \"65d4a54b89c5e342b2c2c5f6\",\n  \"status\": \"failed\",\n  \"price\": 25.5,\n  \"error\": \"Error procesando imagen: Formato de archivo corrupto\",\n  \"createdAt\": \"2024-06-01T12:00:00Z\",\n  \"updatedAt\": \"2024-06-01T12:02:00Z\"\n}"
+								},
+								{
+									"name": "Error de validación",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "X-API-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/tasks/:taskId",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"tasks",
+												":taskId"
+											],
+											"variable": [
+												{
+													"key": "taskId"
+												}
+											]
+										}
+									},
+									"status": "Bad Request",
+									"code": 400,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"VALIDATION_ERROR\",\n  \"message\": \"Se requiere imagePath o imageUrl\",\n  \"statusCode\": 400\n}"
+								},
+								{
+									"name": "Parámetro inválido",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "X-API-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/tasks/:taskId",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"tasks",
+												":taskId"
+											],
+											"variable": [
+												{
+													"key": "taskId"
+												}
+											]
+										}
+									},
+									"status": "Bad Request",
+									"code": 400,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"PARAM_VALIDATION_ERROR\",\n  \"message\": \"taskId debe ser un ObjectId válido\",\n  \"statusCode\": 400\n}"
+								},
+								{
+									"name": "**Recurso no encontrado**\n\nLa tarea solicitada no existe en la base de datos.\n",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "X-API-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/tasks/:taskId",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"tasks",
+												":taskId"
+											],
+											"variable": [
+												{
+													"key": "taskId"
+												}
+											]
+										}
+									},
+									"status": "Not Found",
+									"code": 404,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"TASK_NOT_FOUND\",\n  \"message\": \"La tarea con ID 65d4a54b89c5e342b2c2c5f6 no existe\",\n  \"statusCode\": 404\n}"
+								},
+								{
+									"name": "**Error interno del servidor**\n\nError inesperado en el sistema. Contacte al administrador si persiste.\n",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "X-API-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/tasks/:taskId",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"tasks",
+												":taskId"
+											],
+											"variable": [
+												{
+													"key": "taskId"
+												}
+											]
+										}
+									},
+									"status": "Internal Server Error",
+									"code": 500,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"INTERNAL_SERVER_ERROR\",\n  \"message\": \"Ocurrió un error inesperado en el servidor\",\n  \"statusCode\": 500\n}"
+								}
+							]
+						}
+					]
+				},
+				{
+					"name": "Crear nueva tarea de procesamiento",
+					"request": {
+						"auth": {
+							"type": "apikey",
+							"apikey": [
+								{
+									"key": "key",
+									"value": "X-API-Key",
+									"type": "string"
+								},
+								{
+									"key": "value",
+									"value": "{{apiKey}}",
+									"type": "string"
+								},
+								{
+									"key": "in",
+									"value": "header",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-Idempotency-Key",
+								"value": "123e4567-e89b-12d3-a456-426614174000",
+								"description": "**Clave de idempotencia** para operaciones de escritura.\n\nPreviene la creación duplicada de tareas al reintentar requests.\nSe recomienda usar UUIDs únicos por operación.\n"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"imageUrl\": \"https://picsum.photos/2000/1500.jpg\"\n}",
+							"options": {
+								"raw": {
+									"headerFamily": "json",
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/tasks",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"tasks"
+							]
+						},
+						"description": "Crea una nueva tarea de procesamiento de imagen que soporta **tres fuentes de entrada**:\n\n1. **Archivo subido** (multipart/form-data): Upload directo con validación Multer\n2. **URL remota** (JSON): Descarga automática de imagen desde URL\n3. **Path local** (JSON): Referencia a archivo existente en servidor\n\n### Proceso\n1. Validación de entrada (formato, tamaño, tipo MIME)\n2. Creación de tarea en MongoDB con precio aleatorio (5-50)\n3. Almacenamiento en `storage/images/{taskId}/original.ext`\n4. Encolado para procesamiento asíncrono\n5. Retorno inmediato con taskId y estado 'pending'\n\n### Idempotencia\nUse el header `X-Idempotency-Key` para evitar duplicación de tareas.\n"
+					},
+					"response": [
+						{
+							"name": "Tarea creada",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-Idempotency-Key",
+										"value": "123e4567-e89b-12d3-a456-426614174000",
+										"description": "**Clave de idempotencia** para operaciones de escritura.\n\nPreviene la creación duplicada de tareas al reintentar requests.\nSe recomienda usar UUIDs únicos por operación.\n"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "X-API-Key",
+										"value": "<API Key>",
+										"description": "Added as a part of security scheme: apikey"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"imageUrl\": \"https://picsum.photos/2000/1500.jpg\"\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/tasks",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"tasks"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"taskId\": \"65d4a54b89c5e342b2c2c5f6\",\n  \"status\": \"pending\",\n  \"price\": 25.5\n}"
+						},
+						{
+							"name": "Crear desde path local",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-Idempotency-Key",
+										"value": "123e4567-e89b-12d3-a456-426614174000",
+										"description": "**Clave de idempotencia** para operaciones de escritura.\n\nPreviene la creación duplicada de tareas al reintentar requests.\nSe recomienda usar UUIDs únicos por operación.\n"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "X-API-Key",
+										"value": "<API Key>",
+										"description": "Added as a part of security scheme: apikey"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"imagePath\": \"/uploads/sample-image.jpg\"\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/tasks",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"tasks"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"taskId\": \"65d4a54b89c5e342b2c2c5f6\",\n  \"status\": \"pending\",\n  \"price\": 25.5\n}"
+						},
+						{
+							"name": "Error de validación",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-Idempotency-Key",
+										"value": "123e4567-e89b-12d3-a456-426614174000",
+										"description": "**Clave de idempotencia** para operaciones de escritura.\n\nPreviene la creación duplicada de tareas al reintentar requests.\nSe recomienda usar UUIDs únicos por operación.\n"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "X-API-Key",
+										"value": "<API Key>",
+										"description": "Added as a part of security scheme: apikey"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"imageUrl\": \"https://picsum.photos/2000/1500.jpg\"\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/tasks",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"tasks"
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"error\": \"VALIDATION_ERROR\",\n  \"message\": \"Se requiere imagePath o imageUrl\",\n  \"statusCode\": 400\n}"
+						},
+						{
+							"name": "Parámetro inválido",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-Idempotency-Key",
+										"value": "123e4567-e89b-12d3-a456-426614174000",
+										"description": "**Clave de idempotencia** para operaciones de escritura.\n\nPreviene la creación duplicada de tareas al reintentar requests.\nSe recomienda usar UUIDs únicos por operación.\n"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "X-API-Key",
+										"value": "<API Key>",
+										"description": "Added as a part of security scheme: apikey"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"imagePath\": \"/uploads/sample-image.jpg\"\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/tasks",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"tasks"
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"error\": \"PARAM_VALIDATION_ERROR\",\n  \"message\": \"taskId debe ser un ObjectId válido\",\n  \"statusCode\": 400\n}"
+						},
+						{
+							"name": "Archivo demasiado grande",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-Idempotency-Key",
+										"value": "123e4567-e89b-12d3-a456-426614174000",
+										"description": "**Clave de idempotencia** para operaciones de escritura.\n\nPreviene la creación duplicada de tareas al reintentar requests.\nSe recomienda usar UUIDs únicos por operación.\n"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "X-API-Key",
+										"value": "<API Key>",
+										"description": "Added as a part of security scheme: apikey"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"imageUrl\": \"https://picsum.photos/2000/1500.jpg\"\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/tasks",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"tasks"
+									]
+								}
+							},
+							"status": "Request Entity Too Large",
+							"code": 413,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"error\": \"FILE_TOO_LARGE\",\n  \"message\": \"El archivo excede el tamaño máximo de 10MB\",\n  \"statusCode\": 413\n}"
+						},
+						{
+							"name": "Crear desde path local",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-Idempotency-Key",
+										"value": "123e4567-e89b-12d3-a456-426614174000",
+										"description": "**Clave de idempotencia** para operaciones de escritura.\n\nPreviene la creación duplicada de tareas al reintentar requests.\nSe recomienda usar UUIDs únicos por operación.\n"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "X-API-Key",
+										"value": "<API Key>",
+										"description": "Added as a part of security scheme: apikey"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"imagePath\": \"/uploads/sample-image.jpg\"\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/tasks",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"tasks"
+									]
+								}
+							},
+							"status": "Request Entity Too Large",
+							"code": 413,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"error\": \"FILE_TOO_LARGE\",\n  \"message\": \"El archivo excede el tamaño máximo de 10MB\",\n  \"statusCode\": 413\n}"
+						},
+						{
+							"name": "Fuente de imagen faltante",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-Idempotency-Key",
+										"value": "123e4567-e89b-12d3-a456-426614174000",
+										"description": "**Clave de idempotencia** para operaciones de escritura.\n\nPreviene la creación duplicada de tareas al reintentar requests.\nSe recomienda usar UUIDs únicos por operación.\n"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "X-API-Key",
+										"value": "<API Key>",
+										"description": "Added as a part of security scheme: apikey"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"imageUrl\": \"https://picsum.photos/2000/1500.jpg\"\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/tasks",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"tasks"
+									]
+								}
+							},
+							"status": "Unprocessable Entity (WebDAV) (RFC 4918)",
+							"code": 422,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"error\": \"MISSING_IMAGE_SOURCE\",\n  \"message\": \"Se requiere imagePath, imageUrl o archivo\",\n  \"statusCode\": 400\n}"
+						},
+						{
+							"name": "Retry inválido",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-Idempotency-Key",
+										"value": "123e4567-e89b-12d3-a456-426614174000",
+										"description": "**Clave de idempotencia** para operaciones de escritura.\n\nPreviene la creación duplicada de tareas al reintentar requests.\nSe recomienda usar UUIDs únicos por operación.\n"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "X-API-Key",
+										"value": "<API Key>",
+										"description": "Added as a part of security scheme: apikey"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"imagePath\": \"/uploads/sample-image.jpg\"\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/tasks",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"tasks"
+									]
+								}
+							},
+							"status": "Unprocessable Entity (WebDAV) (RFC 4918)",
+							"code": 422,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"error\": \"INVALID_RETRY_STATE\",\n  \"message\": \"Solo se pueden reintentar tareas fallidas. Estado actual: completed\",\n  \"statusCode\": 400\n}"
+						},
+						{
+							"name": "Error interno",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-Idempotency-Key",
+										"value": "123e4567-e89b-12d3-a456-426614174000",
+										"description": "**Clave de idempotencia** para operaciones de escritura.\n\nPreviene la creación duplicada de tareas al reintentar requests.\nSe recomienda usar UUIDs únicos por operación.\n"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "X-API-Key",
+										"value": "<API Key>",
+										"description": "Added as a part of security scheme: apikey"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"imageUrl\": \"https://picsum.photos/2000/1500.jpg\"\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/tasks",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"tasks"
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"error\": \"INTERNAL_SERVER_ERROR\",\n  \"message\": \"Ocurrió un error inesperado en el servidor\",\n  \"statusCode\": 500\n}"
+						},
+						{
+							"name": "Crear desde path local",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "X-Idempotency-Key",
+										"value": "123e4567-e89b-12d3-a456-426614174000",
+										"description": "**Clave de idempotencia** para operaciones de escritura.\n\nPreviene la creación duplicada de tareas al reintentar requests.\nSe recomienda usar UUIDs únicos por operación.\n"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "X-API-Key",
+										"value": "<API Key>",
+										"description": "Added as a part of security scheme: apikey"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"imagePath\": \"/uploads/sample-image.jpg\"\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/tasks",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"tasks"
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"error\": \"INTERNAL_SERVER_ERROR\",\n  \"message\": \"Ocurrió un error inesperado en el servidor\",\n  \"statusCode\": 500\n}"
+						}
+					]
+				},
+				{
+					"name": "Listar tareas con paginación",
+					"request": {
+						"auth": {
+							"type": "apikey",
+							"apikey": [
+								{
+									"key": "key",
+									"value": "X-API-Key",
+									"type": "string"
+								},
+								{
+									"key": "value",
+									"value": "{{apiKey}}",
+									"type": "string"
+								},
+								{
+									"key": "in",
+									"value": "header",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/tasks?page=1&limit=20&status=completed",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"tasks"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1",
+									"description": "**Número de página** para paginación.\n\nComienza en 1. Si se omite, se usa página 1.\n"
+								},
+								{
+									"key": "limit",
+									"value": "20",
+									"description": "**Cantidad de elementos por página**.\n\nMáximo 100 elementos. Si se omite, se usan 10.\n"
+								},
+								{
+									"key": "status",
+									"value": "completed",
+									"description": "**Filtro por estado de tarea**.\n\nSi se omite, se retornan tareas de todos los estados.\n"
+								}
+							]
+						},
+						"description": "Obtiene una **lista paginada de tareas** con soporte para filtrado por estado.\n\n### Características\n- **Paginación**: Configurable (page, limit)\n- **Filtrado**: Por estado (pending, processing, completed, failed)\n- **Ordenamiento**: Por fecha de creación (más recientes primero)\n- **Performance**: Optimizado con índices MongoDB\n\n### Casos de Uso\n- Monitoreo general del sistema\n- Dashboard administrativo\n- Seguimiento de tareas por estado\n"
+					},
+					"response": [
+						{
+							"name": "Lista de tareas con información de paginación",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "X-API-Key",
+										"value": "<API Key>",
+										"description": "Added as a part of security scheme: apikey"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/tasks?page=1&limit=20&status=completed",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"tasks"
+									],
+									"query": [
+										{
+											"key": "page",
+											"value": "1",
+											"description": "**Número de página** para paginación.\n\nComienza en 1. Si se omite, se usa página 1.\n"
+										},
+										{
+											"key": "limit",
+											"value": "20",
+											"description": "**Cantidad de elementos por página**.\n\nMáximo 100 elementos. Si se omite, se usan 10.\n"
+										},
+										{
+											"key": "status",
+											"value": "completed",
+											"description": "**Filtro por estado de tarea**.\n\nSi se omite, se retornan tareas de todos los estados.\n"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"data\": [\n    {\n      \"taskId\": \"65d4a54b89c5e342b2c2c5f6\",\n      \"status\": \"completed\",\n      \"price\": 25.5,\n      \"images\": [\n        {\n          \"resolution\": \"1024\",\n          \"path\": \"/output/image1/1024/f322b730b287da77e1c519c7ffef4fc2.jpg\"\n        },\n        {\n          \"resolution\": \"800\",\n          \"path\": \"/output/image1/800/202fd8b3174a774bac24428e8cb230a1.jpg\"\n        }\n      ],\n      \"createdAt\": \"2024-06-01T12:00:00Z\",\n      \"updatedAt\": \"2024-06-01T12:10:00Z\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 1,\n    \"totalPages\": 1\n  }\n}"
+						},
+						{
+							"name": "Error de validación",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "X-API-Key",
+										"value": "<API Key>",
+										"description": "Added as a part of security scheme: apikey"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/tasks?page=1&limit=20&status=completed",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"tasks"
+									],
+									"query": [
+										{
+											"key": "page",
+											"value": "1",
+											"description": "**Número de página** para paginación.\n\nComienza en 1. Si se omite, se usa página 1.\n"
+										},
+										{
+											"key": "limit",
+											"value": "20",
+											"description": "**Cantidad de elementos por página**.\n\nMáximo 100 elementos. Si se omite, se usan 10.\n"
+										},
+										{
+											"key": "status",
+											"value": "completed",
+											"description": "**Filtro por estado de tarea**.\n\nSi se omite, se retornan tareas de todos los estados.\n"
+										}
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"error\": \"VALIDATION_ERROR\",\n  \"message\": \"Se requiere imagePath o imageUrl\",\n  \"statusCode\": 400\n}"
+						},
+						{
+							"name": "Parámetro inválido",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "X-API-Key",
+										"value": "<API Key>",
+										"description": "Added as a part of security scheme: apikey"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/tasks?page=1&limit=20&status=completed",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"tasks"
+									],
+									"query": [
+										{
+											"key": "page",
+											"value": "1",
+											"description": "**Número de página** para paginación.\n\nComienza en 1. Si se omite, se usa página 1.\n"
+										},
+										{
+											"key": "limit",
+											"value": "20",
+											"description": "**Cantidad de elementos por página**.\n\nMáximo 100 elementos. Si se omite, se usan 10.\n"
+										},
+										{
+											"key": "status",
+											"value": "completed",
+											"description": "**Filtro por estado de tarea**.\n\nSi se omite, se retornan tareas de todos los estados.\n"
+										}
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"error\": \"PARAM_VALIDATION_ERROR\",\n  \"message\": \"taskId debe ser un ObjectId válido\",\n  \"statusCode\": 400\n}"
+						},
+						{
+							"name": "**Error interno del servidor**\n\nError inesperado en el sistema. Contacte al administrador si persiste.\n",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									},
+									{
+										"key": "X-API-Key",
+										"value": "<API Key>",
+										"description": "Added as a part of security scheme: apikey"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/tasks?page=1&limit=20&status=completed",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"tasks"
+									],
+									"query": [
+										{
+											"key": "page",
+											"value": "1",
+											"description": "**Número de página** para paginación.\n\nComienza en 1. Si se omite, se usa página 1.\n"
+										},
+										{
+											"key": "limit",
+											"value": "20",
+											"description": "**Cantidad de elementos por página**.\n\nMáximo 100 elementos. Si se omite, se usan 10.\n"
+										},
+										{
+											"key": "status",
+											"value": "completed",
+											"description": "**Filtro por estado de tarea**.\n\nSi se omite, se retornan tareas de todos los estados.\n"
+										}
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"error\": \"INTERNAL_SERVER_ERROR\",\n  \"message\": \"Ocurrió un error inesperado en el servidor\",\n  \"statusCode\": 500\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "queue",
+			"item": [
+				{
+					"name": "stats",
+					"item": [
+						{
+							"name": "Estadísticas de la cola BullMQ",
+							"request": {
+								"auth": {
+									"type": "apikey",
+									"apikey": [
+										{
+											"key": "key",
+											"value": "X-API-Key",
+											"type": "string"
+										},
+										{
+											"key": "value",
+											"value": "{{apiKey}}",
+											"type": "string"
+										},
+										{
+											"key": "in",
+											"value": "header",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/queue/stats",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"queue",
+										"stats"
+									]
+								},
+								"description": "**Dashboard de monitoreo** de la cola de procesamiento.\n\nRetorna conteos en tiempo real de trabajos por estado para monitoreo operacional.\n"
+							},
+							"response": [
+								{
+									"name": "Estadísticas actuales de la cola",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "X-API-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/queue/stats",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"queue",
+												"stats"
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"waiting\": 5,\n  \"active\": 2,\n  \"completed\": 128,\n  \"failed\": 3,\n  \"delayed\": 0,\n  \"paused\": 0\n}"
+								},
+								{
+									"name": "**Error interno del servidor**\n\nError inesperado en el sistema. Contacte al administrador si persiste.\n",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "X-API-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/queue/stats",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"queue",
+												"stats"
+											]
+										}
+									},
+									"status": "Internal Server Error",
+									"code": 500,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"INTERNAL_SERVER_ERROR\",\n  \"message\": \"Ocurrió un error inesperado en el servidor\",\n  \"statusCode\": 500\n}"
+								}
+							]
+						}
+					]
+				},
+				{
+					"name": "jobs",
+					"item": [
+						{
+							"name": "{state}",
+							"item": [
+								{
+									"name": "Listar trabajos por estado",
+									"request": {
+										"auth": {
+											"type": "apikey",
+											"apikey": [
+												{
+													"key": "key",
+													"value": "X-API-Key",
+													"type": "string"
+												},
+												{
+													"key": "value",
+													"value": "{{apiKey}}",
+													"type": "string"
+												},
+												{
+													"key": "in",
+													"value": "header",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/queue/jobs/:state",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"queue",
+												"jobs",
+												":state"
+											],
+											"variable": [
+												{
+													"key": "state",
+													"value": "waiting",
+													"description": "(Required) **Estado de trabajos BullMQ**\n\nEstados del ciclo de vida de trabajos en la cola.\n"
+												}
+											]
+										},
+										"description": "Obtiene detalles de trabajos en un estado específico de BullMQ"
+									},
+									"response": [
+										{
+											"name": "Lista de trabajos en el estado especificado",
+											"originalRequest": {
+												"method": "GET",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/json"
+													},
+													{
+														"key": "X-API-Key",
+														"value": "<API Key>",
+														"description": "Added as a part of security scheme: apikey"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/queue/jobs/:state",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"queue",
+														"jobs",
+														":state"
+													],
+													"variable": [
+														{
+															"key": "state"
+														}
+													]
+												}
+											},
+											"status": "OK",
+											"code": 200,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "[\n  {\n    \"id\": \"job-123\",\n    \"name\": \"process-image\",\n    \"data\": {\n      \"taskId\": \"65d4a54b89c5e342b2c2c5f6\",\n      \"imagePath\": \"/storage/images/65d4a54b89c5e342b2c2c5f6/original.jpg\",\n      \"timestamp\": 1609459200000\n    },\n    \"returnvalue\": {},\n    \"failedReason\": \"string\",\n    \"timestamp\": 6142.147828981406,\n    \"attemptsMade\": 7065\n  },\n  {\n    \"id\": \"job-123\",\n    \"name\": \"process-image\",\n    \"data\": {\n      \"taskId\": \"65d4a54b89c5e342b2c2c5f6\",\n      \"imagePath\": \"/storage/images/65d4a54b89c5e342b2c2c5f6/original.jpg\",\n      \"timestamp\": 1609459200000\n    },\n    \"returnvalue\": {},\n    \"failedReason\": \"string\",\n    \"timestamp\": 3548.8451608462456,\n    \"attemptsMade\": 9762\n  }\n]"
+										},
+										{
+											"name": "**Error interno del servidor**\n\nError inesperado en el sistema. Contacte al administrador si persiste.\n",
+											"originalRequest": {
+												"method": "GET",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/json"
+													},
+													{
+														"key": "X-API-Key",
+														"value": "<API Key>",
+														"description": "Added as a part of security scheme: apikey"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/queue/jobs/:state",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"queue",
+														"jobs",
+														":state"
+													],
+													"variable": [
+														{
+															"key": "state"
+														}
+													]
+												}
+											},
+											"status": "Internal Server Error",
+											"code": 500,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"error\": \"INTERNAL_SERVER_ERROR\",\n  \"message\": \"Ocurrió un error inesperado en el servidor\",\n  \"statusCode\": 500\n}"
+										}
+									]
+								}
+							]
+						},
+						{
+							"name": "{id}",
+							"item": [
+								{
+									"name": "Eliminar trabajo de la cola",
+									"request": {
+										"auth": {
+											"type": "apikey",
+											"apikey": [
+												{
+													"key": "key",
+													"value": "X-API-Key",
+													"type": "string"
+												},
+												{
+													"key": "value",
+													"value": "{{apiKey}}",
+													"type": "string"
+												},
+												{
+													"key": "in",
+													"value": "header",
+													"type": "string"
+												}
+											]
+										},
+										"method": "DELETE",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/queue/jobs/:id",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"queue",
+												"jobs",
+												":id"
+											],
+											"variable": [
+												{
+													"key": "id",
+													"value": "bull:image-processing:123",
+													"description": "(Required) ID del trabajo en la cola BullMQ"
+												}
+											]
+										},
+										"description": "Elimina un trabajo específico de la cola BullMQ por su ID"
+									},
+									"response": [
+										{
+											"name": "Trabajo eliminado exitosamente",
+											"originalRequest": {
+												"method": "DELETE",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/json"
+													},
+													{
+														"key": "X-API-Key",
+														"value": "<API Key>",
+														"description": "Added as a part of security scheme: apikey"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/queue/jobs/:id",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"queue",
+														"jobs",
+														":id"
+													],
+													"variable": [
+														{
+															"key": "id"
+														}
+													]
+												}
+											},
+											"status": "OK",
+											"code": 200,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"deleted\": true,\n  \"jobId\": \"job-123\"\n}"
+										},
+										{
+											"name": "**Error interno del servidor**\n\nError inesperado en el sistema. Contacte al administrador si persiste.\n",
+											"originalRequest": {
+												"method": "DELETE",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/json"
+													},
+													{
+														"key": "X-API-Key",
+														"value": "<API Key>",
+														"description": "Added as a part of security scheme: apikey"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/queue/jobs/:id",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"queue",
+														"jobs",
+														":id"
+													],
+													"variable": [
+														{
+															"key": "id"
+														}
+													]
+												}
+											},
+											"status": "Internal Server Error",
+											"code": 500,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"error\": \"INTERNAL_SERVER_ERROR\",\n  \"message\": \"Ocurrió un error inesperado en el servidor\",\n  \"statusCode\": 500\n}"
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "redis",
+			"item": [
+				{
+					"name": "keys",
+					"item": [
+						{
+							"name": "{key}",
+							"item": [
+								{
+									"name": "Eliminar clave específica",
+									"request": {
+										"auth": {
+											"type": "apikey",
+											"apikey": [
+												{
+													"key": "key",
+													"value": "X-API-Key",
+													"type": "string"
+												},
+												{
+													"key": "value",
+													"value": "{{apiKey}}",
+													"type": "string"
+												},
+												{
+													"key": "in",
+													"value": "header",
+													"type": "string"
+												}
+											]
+										},
+										"method": "DELETE",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/redis/keys/:key",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"redis",
+												"keys",
+												":key"
+											],
+											"variable": [
+												{
+													"key": "key",
+													"value": "task:65d4a54b89c5e342b2c2c5f6",
+													"description": "(Required) Clave específica de Redis a eliminar"
+												}
+											]
+										},
+										"description": "Elimina una clave específica de Redis"
+									},
+									"response": [
+										{
+											"name": "Clave eliminada",
+											"originalRequest": {
+												"method": "DELETE",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/json"
+													},
+													{
+														"key": "X-API-Key",
+														"value": "<API Key>",
+														"description": "Added as a part of security scheme: apikey"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/redis/keys/:key",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"redis",
+														"keys",
+														":key"
+													],
+													"variable": [
+														{
+															"key": "key"
+														}
+													]
+												}
+											},
+											"status": "OK",
+											"code": 200,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"key\": \"string\",\n  \"deleted\": false\n}"
+										},
+										{
+											"name": "**Error interno del servidor**\n\nError inesperado en el sistema. Contacte al administrador si persiste.\n",
+											"originalRequest": {
+												"method": "DELETE",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/json"
+													},
+													{
+														"key": "X-API-Key",
+														"value": "<API Key>",
+														"description": "Added as a part of security scheme: apikey"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/redis/keys/:key",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"redis",
+														"keys",
+														":key"
+													],
+													"variable": [
+														{
+															"key": "key"
+														}
+													]
+												}
+											},
+											"status": "Internal Server Error",
+											"code": 500,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"error\": \"INTERNAL_SERVER_ERROR\",\n  \"message\": \"Ocurrió un error inesperado en el servidor\",\n  \"statusCode\": 500\n}"
+										}
+									]
+								}
+							]
+						},
+						{
+							"name": "Listar claves de Redis",
+							"request": {
+								"auth": {
+									"type": "apikey",
+									"apikey": [
+										{
+											"key": "key",
+											"value": "X-API-Key",
+											"type": "string"
+										},
+										{
+											"key": "value",
+											"value": "{{apiKey}}",
+											"type": "string"
+										},
+										{
+											"key": "in",
+											"value": "header",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/redis/keys?pattern=task:*",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"redis",
+										"keys"
+									],
+									"query": [
+										{
+											"key": "pattern",
+											"value": "task:*",
+											"description": "**Patrón de búsqueda Redis** (sintaxis glob).\n\nEjemplos: `task:*`, `bull:*`, `idempotency:*`\n"
+										}
+									]
+								},
+								"description": "**Herramienta de debugging** para inspeccionar claves de Redis.\n\nPermite buscar claves usando patrones glob para análisis del cache.\n"
+							},
+							"response": [
+								{
+									"name": "Lista de claves encontradas",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "X-API-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/redis/keys?pattern=task:*",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"redis",
+												"keys"
+											],
+											"query": [
+												{
+													"key": "pattern",
+													"value": "task:*",
+													"description": "**Patrón de búsqueda Redis** (sintaxis glob).\n\nEjemplos: `task:*`, `bull:*`, `idempotency:*`\n"
+												}
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"pattern\": \"string\",\n  \"count\": 8614,\n  \"keys\": [\n    \"string\",\n    \"string\"\n  ]\n}"
+								},
+								{
+									"name": "**Error interno del servidor**\n\nError inesperado en el sistema. Contacte al administrador si persiste.\n",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "X-API-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/redis/keys?pattern=task:*",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"redis",
+												"keys"
+											],
+											"query": [
+												{
+													"key": "pattern",
+													"value": "task:*",
+													"description": "**Patrón de búsqueda Redis** (sintaxis glob).\n\nEjemplos: `task:*`, `bull:*`, `idempotency:*`\n"
+												}
+											]
+										}
+									},
+									"status": "Internal Server Error",
+									"code": 500,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"INTERNAL_SERVER_ERROR\",\n  \"message\": \"Ocurrió un error inesperado en el servidor\",\n  \"statusCode\": 500\n}"
+								}
+							]
+						},
+						{
+							"name": "Eliminar claves por patrón",
+							"request": {
+								"auth": {
+									"type": "apikey",
+									"apikey": [
+										{
+											"key": "key",
+											"value": "X-API-Key",
+											"type": "string"
+										},
+										{
+											"key": "value",
+											"value": "{{apiKey}}",
+											"type": "string"
+										},
+										{
+											"key": "in",
+											"value": "header",
+											"type": "string"
+										}
+									]
+								},
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/redis/keys?pattern=task:*",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"redis",
+										"keys"
+									],
+									"query": [
+										{
+											"key": "pattern",
+											"value": "task:*",
+											"description": "**Patrón de búsqueda Redis** (sintaxis glob).\n\nEjemplos: `task:*`, `bull:*`, `idempotency:*`\n"
+										}
+									]
+								},
+								"description": "Elimina múltiples claves de Redis que coincidan con un patrón"
+							},
+							"response": [
+								{
+									"name": "Claves eliminadas",
+									"originalRequest": {
+										"method": "DELETE",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "X-API-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/redis/keys?pattern=task:*",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"redis",
+												"keys"
+											],
+											"query": [
+												{
+													"key": "pattern",
+													"value": "task:*",
+													"description": "**Patrón de búsqueda Redis** (sintaxis glob).\n\nEjemplos: `task:*`, `bull:*`, `idempotency:*`\n"
+												}
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"pattern\": \"string\",\n  \"deleted\": 9323\n}"
+								},
+								{
+									"name": "**Error interno del servidor**\n\nError inesperado en el sistema. Contacte al administrador si persiste.\n",
+									"originalRequest": {
+										"method": "DELETE",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "X-API-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/redis/keys?pattern=task:*",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"redis",
+												"keys"
+											],
+											"query": [
+												{
+													"key": "pattern",
+													"value": "task:*",
+													"description": "**Patrón de búsqueda Redis** (sintaxis glob).\n\nEjemplos: `task:*`, `bull:*`, `idempotency:*`\n"
+												}
+											]
+										}
+									},
+									"status": "Internal Server Error",
+									"code": 500,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"INTERNAL_SERVER_ERROR\",\n  \"message\": \"Ocurrió un error inesperado en el servidor\",\n  \"statusCode\": 500\n}"
+								}
+							]
+						}
+					]
+				},
+				{
+					"name": "get",
+					"item": [
+						{
+							"name": "Obtener valor de clave Redis",
+							"request": {
+								"auth": {
+									"type": "apikey",
+									"apikey": [
+										{
+											"key": "key",
+											"value": "X-API-Key",
+											"type": "string"
+										},
+										{
+											"key": "value",
+											"value": "{{apiKey}}",
+											"type": "string"
+										},
+										{
+											"key": "in",
+											"value": "header",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/redis/get?key=task:65d4a54b89c5e342b2c2c5f6",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"redis",
+										"get"
+									],
+									"query": [
+										{
+											"key": "key",
+											"value": "task:65d4a54b89c5e342b2c2c5f6",
+											"description": "(Required) Clave específica de Redis a consultar"
+										}
+									]
+								},
+								"description": "Obtiene y parsea el valor asociado a una clave específica"
+							},
+							"response": [
+								{
+									"name": "Valor de la clave",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "X-API-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/redis/get?key=task:65d4a54b89c5e342b2c2c5f6",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"redis",
+												"get"
+											],
+											"query": [
+												{
+													"key": "key",
+													"value": "task:65d4a54b89c5e342b2c2c5f6",
+													"description": "(Required) Clave específica de Redis a consultar"
+												}
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"key\": \"string\",\n  \"value\": {}\n}"
+								},
+								{
+									"name": "Error de validación",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "X-API-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/redis/get?key=task:65d4a54b89c5e342b2c2c5f6",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"redis",
+												"get"
+											],
+											"query": [
+												{
+													"key": "key",
+													"value": "task:65d4a54b89c5e342b2c2c5f6",
+													"description": "(Required) Clave específica de Redis a consultar"
+												}
+											]
+										}
+									},
+									"status": "Bad Request",
+									"code": 400,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"VALIDATION_ERROR\",\n  \"message\": \"Se requiere imagePath o imageUrl\",\n  \"statusCode\": 400\n}"
+								},
+								{
+									"name": "Parámetro inválido",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "X-API-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/redis/get?key=task:65d4a54b89c5e342b2c2c5f6",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"redis",
+												"get"
+											],
+											"query": [
+												{
+													"key": "key",
+													"value": "task:65d4a54b89c5e342b2c2c5f6",
+													"description": "(Required) Clave específica de Redis a consultar"
+												}
+											]
+										}
+									},
+									"status": "Bad Request",
+									"code": 400,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"PARAM_VALIDATION_ERROR\",\n  \"message\": \"taskId debe ser un ObjectId válido\",\n  \"statusCode\": 400\n}"
+								},
+								{
+									"name": "**Error interno del servidor**\n\nError inesperado en el sistema. Contacte al administrador si persiste.\n",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											},
+											{
+												"key": "X-API-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/redis/get?key=task:65d4a54b89c5e342b2c2c5f6",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"redis",
+												"get"
+											],
+											"query": [
+												{
+													"key": "key",
+													"value": "task:65d4a54b89c5e342b2c2c5f6",
+													"description": "(Required) Clave específica de Redis a consultar"
+												}
+											]
+										}
+									},
+									"status": "Internal Server Error",
+									"code": 500,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"error\": \"INTERNAL_SERVER_ERROR\",\n  \"message\": \"Ocurrió un error inesperado en el servidor\",\n  \"statusCode\": 500\n}"
+								}
+							]
+						}
+					]
+				},
+				{
+					"name": "all",
+					"item": [
+						{
+							"name": "keys",
+							"item": [
+								{
+									"name": "Inspección completa de Redis BullMQ",
+									"request": {
+										"auth": {
+											"type": "apikey",
+											"apikey": [
+												{
+													"key": "key",
+													"value": "X-API-Key",
+													"type": "string"
+												},
+												{
+													"key": "value",
+													"value": "{{apiKey}}",
+													"type": "string"
+												},
+												{
+													"key": "in",
+													"value": "header",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/redis/all/keys",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"redis",
+												"all",
+												"keys"
+											]
+										},
+										"description": "**Debug avanzado** - Obtiene todas las claves relacionadas con BullMQ \ny sus valores clasificados por tipo de estructura Redis.\n"
+									},
+									"response": [
+										{
+											"name": "Estructura completa de claves BullMQ",
+											"originalRequest": {
+												"method": "GET",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/json"
+													},
+													{
+														"key": "X-API-Key",
+														"value": "<API Key>",
+														"description": "Added as a part of security scheme: apikey"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/redis/all/keys",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"redis",
+														"all",
+														"keys"
+													]
+												}
+											},
+											"status": "OK",
+											"code": 200,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"keys\": {\n    \"info\": [\n      {\n        \"key\": \"string\",\n        \"type\": \"list\",\n        \"value\": {\n          \"description\": \"Valor según el tipo de estructura\"\n        }\n      },\n      {\n        \"key\": \"string\",\n        \"type\": \"list\",\n        \"value\": {\n          \"description\": \"Valor según el tipo de estructura\"\n        }\n      }\n    ],\n    \"count\": 1331\n  }\n}"
+										},
+										{
+											"name": "**Error interno del servidor**\n\nError inesperado en el sistema. Contacte al administrador si persiste.\n",
+											"originalRequest": {
+												"method": "GET",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/json"
+													},
+													{
+														"key": "X-API-Key",
+														"value": "<API Key>",
+														"description": "Added as a part of security scheme: apikey"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/redis/all/keys",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"redis",
+														"all",
+														"keys"
+													]
+												}
+											},
+											"status": "Internal Server Error",
+											"code": 500,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"error\": \"INTERNAL_SERVER_ERROR\",\n  \"message\": \"Ocurrió un error inesperado en el servidor\",\n  \"statusCode\": 500\n}"
+										}
+									]
+								}
+							]
+						},
+						{
+							"name": "events",
+							"item": [
+								{
+									"name": "Streams de eventos Redis",
+									"request": {
+										"auth": {
+											"type": "apikey",
+											"apikey": [
+												{
+													"key": "key",
+													"value": "X-API-Key",
+													"type": "string"
+												},
+												{
+													"key": "value",
+													"value": "{{apiKey}}",
+													"type": "string"
+												},
+												{
+													"key": "in",
+													"value": "header",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/json"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/redis/all/events",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"redis",
+												"all",
+												"events"
+											]
+										},
+										"description": "**Event Sourcing** - Obtiene todos los streams de eventos de Redis \npara análisis del flujo de eventos del sistema.\n"
+									},
+									"response": [
+										{
+											"name": "Streams de eventos del sistema",
+											"originalRequest": {
+												"method": "GET",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/json"
+													},
+													{
+														"key": "X-API-Key",
+														"value": "<API Key>",
+														"description": "Added as a part of security scheme: apikey"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/redis/all/events",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"redis",
+														"all",
+														"events"
+													]
+												}
+											},
+											"status": "OK",
+											"code": 200,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"count\": 2197,\n  \"eventStreams\": [\n    {\n      \"streamKey\": \"string\",\n      \"events\": [\n        {\n          \"id\": \"string\",\n          \"data\": {}\n        },\n        {\n          \"id\": \"string\",\n          \"data\": {}\n        }\n      ]\n    },\n    {\n      \"streamKey\": \"string\",\n      \"events\": [\n        {\n          \"id\": \"string\",\n          \"data\": {}\n        },\n        {\n          \"id\": \"string\",\n          \"data\": {}\n        }\n      ]\n    }\n  ]\n}"
+										},
+										{
+											"name": "**Error interno del servidor**\n\nError inesperado en el sistema. Contacte al administrador si persiste.\n",
+											"originalRequest": {
+												"method": "GET",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/json"
+													},
+													{
+														"key": "X-API-Key",
+														"value": "<API Key>",
+														"description": "Added as a part of security scheme: apikey"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/redis/all/events",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"redis",
+														"all",
+														"events"
+													]
+												}
+											},
+											"status": "Internal Server Error",
+											"code": 500,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"error\": \"INTERNAL_SERVER_ERROR\",\n  \"message\": \"Ocurrió un error inesperado en el servidor\",\n  \"statusCode\": 500\n}"
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	],
+	"auth": {
+		"type": "apikey",
+		"apikey": [
+			{
+				"key": "key",
+				"value": "X-API-Key",
+				"type": "string"
+			},
+			{
+				"key": "value",
+				"value": "{{apiKey}}",
+				"type": "string"
+			},
+			{
+				"key": "in",
+				"value": "header",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3000/api/v1"
+		}
+	]
+}

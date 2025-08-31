@@ -1,0 +1,1242 @@
+openapi: 3.0.3
+info:
+  description: |
+    - **API REST para procesamiento de imágenes con sistema de jobs , events con bullmq parallel processing**
+    - **Arquitectura híbrida Clean Architecture + CQRS + Event-Driven** para el procesamiento asíncrono de imágenes
+  title: Image Processing API
+  version: 1.0.0
+  contact:
+    name: FullStack React - Backend Senior JMRG
+    email: info@jmrg.dev
+    url: https://github.com/jmrg-link/poc-backend-kairosds
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+- url: http://localhost:3000/api/v1
+  description: Servidor de desarrollo local
+- url: http://localhost/api/v1
+  description: Servidor Docker local (hostname - docker-compose)
+- url: https://api.poc.jmrg.dev/v1
+  description: Servidor de producción (proxy - balancer - Traefik + ssl)
+
+tags:
+- name: Tasks
+  description: |
+    - **API Pública** - Gestión completa del ciclo de vida de tareas de procesamiento de imágenes.
+    - Incluye creación desde múltiples fuentes (upload, URL, path local), consulta de estado y reintentos.
+- name: Queue (Internal)
+  description: |
+    - **API Interna** - Monitoreo y gestión de la cola BullMQ.
+    - Endpoints administrativos para inspeccionar el estado de los trabajos en cola.
+- name: Cache (Internal)
+  description: |
+    - **API Interna** - Gestión del cache Redis.
+    - Herramientas de debugging y administración del almacén de cache.
+
+paths:
+  /tasks:
+    post:
+      tags:
+      - Tasks
+      summary: Crear nueva tarea de procesamiento
+      description: |
+        Crea una nueva tarea de procesamiento de imagen que soporta **tres fuentes de entrada**:
+
+        1. **Archivo subido** (multipart/form-data): Upload directo con validación Multer
+        2. **URL remota** (JSON): Descarga automática de imagen desde URL
+        3. **Path local** (JSON): Referencia a archivo existente en servidor
+
+        ### Proceso
+        1. Validación de entrada (formato, tamaño, tipo MIME)
+        2. Creación de tarea en MongoDB con precio aleatorio (5-50)
+        3. Almacenamiento en `storage/images/{taskId}/original.ext`
+        4. Encolado para procesamiento asíncrono
+        5. Retorno inmediato con taskId y estado 'pending'
+
+        ### Idempotencia
+        Use el header `X-Idempotency-Key` para evitar duplicación de tareas.
+      operationId: createTask
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+            examples:
+              fromUrl:
+                summary: Crear desde URL
+                value:
+                  imageUrl: "https://picsum.photos/2000/1500.jpg"
+              fromPath:
+                summary: Crear desde path local
+                value:
+                  imagePath: "/uploads/sample-image.jpg"
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - image
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: Archivo de imagen (JPEG, PNG, WebP, máx 10MB)
+            examples:
+              fileUpload:
+                summary: Upload de archivo
+                description: Seleccione un archivo de imagen
+      responses:
+        '201':
+          description: |
+            **Tarea creada exitosamente**
+
+            La tarea se ha creado y encolado para procesamiento.
+            Use el `taskId` para consultar el progreso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateTaskResponse'
+              examples:
+                created:
+                  summary: Tarea creada
+                  value:
+                    taskId: "65d4a54b89c5e342b2c2c5f6"
+                    status: "pending"
+                    price: 25.5
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+      - ApiKeyAuth: []
+
+    get:
+      tags:
+      - Tasks
+      summary: Listar tareas con paginación
+      description: |
+        Obtiene una **lista paginada de tareas** con soporte para filtrado por estado.
+
+        ### Características
+        - **Paginación**: Configurable (page, limit)
+        - **Filtrado**: Por estado (pending, processing, completed, failed)
+        - **Ordenamiento**: Por fecha de creación (más recientes primero)
+        - **Performance**: Optimizado con índices MongoDB
+
+        ### Casos de Uso
+        - Monitoreo general del sistema
+        - Dashboard administrativo
+        - Seguimiento de tareas por estado
+      operationId: listTasks
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Status'
+      responses:
+        '200':
+          description: Lista de tareas con información de paginación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskListResponse'
+              examples:
+                taskList:
+                  summary: Lista de tareas
+                  value:
+                    data:
+                    - taskId: "65d4a54b89c5e342b2c2c5f6"
+                      status: "completed"
+                      price: 25.5
+                      images:
+                      - resolution: "1024"
+                        path: "/output/image1/1024/f322b730b287da77e1c519c7ffef4fc2.jpg"
+                      - resolution: "800"
+                        path: "/output/image1/800/202fd8b3174a774bac24428e8cb230a1.jpg"
+                      createdAt: "2024-06-01T12:00:00Z"
+                      updatedAt: "2024-06-01T12:10:00Z"
+                    pagination:
+                      page: 1
+                      limit: 10
+                      total: 1
+                      totalPages: 1
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+      - ApiKeyAuth: []
+
+  /tasks/upload:
+    post:
+      tags:
+      - Tasks
+      summary: Crear tarea con upload directo
+      description: |
+        **Endpoint especializado** para creación de tareas mediante upload directo de archivos.
+
+        ### Características
+        - **Solo multipart/form-data**: Optimizado para uploads
+        - **Validación estricta**: Tipo MIME, tamaño, formato
+        - **Procesamiento inmediato**: Sin descarga adicional
+        - **Performance**: Más rápido que el endpoint genérico
+
+        ### Validaciones Multer
+        - **Tipos permitidos**: image/jpeg, image/png, image/webp
+        - **Tamaño máximo**: 10MB (10,485,760 bytes)
+        - **Archivos**: Solo 1 archivo por request
+        - **Campo**: Debe llamarse 'image'
+      operationId: createTaskWithUpload
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - image
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: |
+                    **Archivo de imagen a procesar**
+
+                    - Formatos: JPEG, PNG, WebP
+                    - Tamaño máximo: 10MB
+                    - Resolución recomendada: Mínimo 800px de ancho
+            encoding:
+              image:
+                contentType: image/jpeg, image/png, image/webp
+      responses:
+        '201':
+          description: Tarea creada exitosamente desde upload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateTaskResponse'
+              examples:
+                uploadCreated:
+                  summary: Upload exitoso
+                  value:
+                    taskId: "65d4a54b89c5e342b2c2c5f6"
+                    status: "pending"
+                    price: 35.0
+        '400':
+          description: Error de validación (archivo requerido, tipo inválido)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                fileRequired:
+                  summary: Archivo requerido
+                  value:
+                    error: "FILE_REQUIRED"
+                    message: "Se requiere un archivo de imagen"
+                    statusCode: 400
+                invalidType:
+                  summary: Tipo inválido
+                  value:
+                    error: "INVALID_FILE_TYPE"
+                    message: "Tipo de archivo no soportado. Solo se permiten: JPEG, PNG, WebP"
+                    statusCode: 400
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+      - ApiKeyAuth: []
+
+  /tasks/{taskId}:
+    get:
+      tags:
+      - Tasks
+      summary: Obtener detalles de una tarea
+      description: |
+        Consulta el **estado actual y detalles** de una tarea específica.
+
+        ### Estados Posibles
+        - **pending**: Tarea creada, esperando procesamiento
+        - **processing**: Worker está procesando la imagen
+        - **completed**: Procesamiento finalizado con éxito
+        - **failed**: Error durante el procesamiento
+
+        ### Información Incluida
+        - **Estado actual** y timestamps
+        - **Precio asignado** (aleatorio 5-50)
+        - **Imágenes procesadas** (solo si completed)
+        - **Error detallado** (solo si failed)
+
+        ### Paths de Imágenes
+        Las imágenes procesadas siguen el patrón:
+        `/storage/images/{taskId}/{resolution}/{md5}.{ext}`
+      operationId: getTaskById
+      parameters:
+      - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Información detallada de la tarea
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+              examples:
+                taskPending:
+                  summary: Tarea pendiente
+                  value:
+                    taskId: "65d4a54b89c5e342b2c2c5f6"
+                    status: "pending"
+                    price: 25.5
+                    createdAt: "2024-06-01T12:00:00Z"
+                    updatedAt: "2024-06-01T12:00:00Z"
+                taskProcessing:
+                  summary: Tarea en procesamiento
+                  value:
+                    taskId: "65d4a54b89c5e342b2c2c5f6"
+                    status: "processing"
+                    price: 25.5
+                    createdAt: "2024-06-01T12:00:00Z"
+                    updatedAt: "2024-06-01T12:05:00Z"
+                taskCompleted:
+                  summary: Tarea completada
+                  value:
+                    taskId: "65d4a54b89c5e342b2c2c5f6"
+                    status: "completed"
+                    price: 25.5
+                    images:
+                    - resolution: "1024"
+                      path: "/output/image1/1024/f322b730b287da77e1c519c7ffef4fc2.jpg"
+                    - resolution: "800"
+                      path: "/output/image1/800/202fd8b3174a774bac24428e8cb230a1.jpg"
+                    createdAt: "2024-06-01T12:00:00Z"
+                    updatedAt: "2024-06-01T12:10:00Z"
+                taskFailed:
+                  summary: Tarea fallida
+                  value:
+                    taskId: "65d4a54b89c5e342b2c2c5f6"
+                    status: "failed"
+                    price: 25.5
+                    error: "Error procesando imagen: Formato de archivo corrupto"
+                    createdAt: "2024-06-01T12:00:00Z"
+                    updatedAt: "2024-06-01T12:02:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+      - ApiKeyAuth: []
+
+  /tasks/{taskId}/retry:
+    post:
+      tags:
+      - Tasks
+      summary: Reintentar tarea fallida
+      description: |
+        **Reintenta el procesamiento** de una tarea que ha fallado previamente.
+
+        ### Requisitos
+        - La tarea debe existir
+        - Estado actual debe ser 'failed'
+        - El archivo original debe estar disponible
+
+        ### Proceso
+        1. Valida que la tarea esté en estado 'failed'
+        2. Cambia estado a 'pending'
+        3. Re-encola la tarea con la misma configuración
+        4. Mantiene el mismo precio original
+
+        ### Limitaciones
+        - Solo tareas en estado 'failed' pueden reintentarse
+        - El precio original se mantiene
+        - Los archivos procesados previamente se sobrescriben
+      operationId: retryTask
+      parameters:
+      - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Tarea re-encolada exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskPendingResponse'
+              examples:
+                retrySuccess:
+                  summary: Retry exitoso
+                  value:
+                    taskId: "65d4a54b89c5e342b2c2c5f6"
+                    status: "pending"
+                    price: 25.5
+                    createdAt: "2024-06-01T12:00:00Z"
+                    updatedAt: "2024-06-01T12:15:00Z"
+        '400':
+          description: Estado inválido para retry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidState:
+                  summary: Estado inválido
+                  value:
+                    error: "INVALID_RETRY_STATE"
+                    message: "Solo se pueden reintentar tareas fallidas. Estado actual: completed"
+                    statusCode: 400
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+      - ApiKeyAuth: []
+
+  # Endpoints Internos de Monitoreo
+  /queue/stats:
+    get:
+      tags:
+      - Queue (Internal)
+      summary: Estadísticas de la cola BullMQ
+      description: |
+        **Dashboard de monitoreo** de la cola de procesamiento.
+
+        Retorna conteos en tiempo real de trabajos por estado para monitoreo operacional.
+      operationId: getQueueStats
+      responses:
+        '200':
+          description: Estadísticas actuales de la cola
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueStats'
+              examples:
+                queueStats:
+                  summary: Estadísticas típicas
+                  value:
+                    waiting: 5
+                    active: 2
+                    completed: 128
+                    failed: 3
+                    delayed: 0
+                    paused: 0
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+      - ApiKeyAuth: []
+
+  /queue/jobs/{state}:
+    get:
+      tags:
+      - Queue (Internal)
+      summary: Listar trabajos por estado
+      description: Obtiene detalles de trabajos en un estado específico de BullMQ
+      operationId: getQueueJobsByState
+      parameters:
+      - $ref: '#/components/parameters/JobState'
+      responses:
+        '200':
+          description: Lista de trabajos en el estado especificado
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/QueueJob'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+      - ApiKeyAuth: []
+
+  /queue/jobs/{id}:
+    delete:
+      tags:
+      - Queue (Internal)
+      summary: Eliminar trabajo de la cola
+      description: Elimina un trabajo específico de la cola BullMQ por su ID
+      operationId: deleteJobById
+      parameters:
+      - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Trabajo eliminado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+                    example: true
+                  jobId:
+                    type: string
+                    example: "job-123"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+      - ApiKeyAuth: []
+
+  # Endpoints de Cache Redis
+  /redis/keys:
+    get:
+      tags:
+      - Cache (Internal)
+      summary: Listar claves de Redis
+      description: |
+        **Herramienta de debugging** para inspeccionar claves de Redis.
+
+        Permite buscar claves usando patrones glob para análisis del cache.
+      operationId: getRedisKeys
+      parameters:
+      - $ref: '#/components/parameters/RedisPattern'
+      responses:
+        '200':
+          description: Lista de claves encontradas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RedisKeysResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+      - ApiKeyAuth: []
+
+    delete:
+      tags:
+      - Cache (Internal)
+      summary: Eliminar claves por patrón
+      description: Elimina múltiples claves de Redis que coincidan con un patrón
+      operationId: deleteRedisKeys
+      parameters:
+      - $ref: '#/components/parameters/RedisPattern'
+      responses:
+        '200':
+          description: Claves eliminadas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RedisDeleteResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+      - ApiKeyAuth: []
+
+  /redis/get:
+    get:
+      tags:
+      - Cache (Internal)
+      summary: Obtener valor de clave Redis
+      description: Obtiene y parsea el valor asociado a una clave específica
+      operationId: getRedisValue
+      parameters:
+      - $ref: '#/components/parameters/RedisKey'
+      responses:
+        '200':
+          description: Valor de la clave
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RedisValueResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+      - ApiKeyAuth: []
+
+  /redis/keys/{key}:
+    delete:
+      tags:
+      - Cache (Internal)
+      summary: Eliminar clave específica
+      description: Elimina una clave específica de Redis
+      operationId: deleteRedisKey
+      parameters:
+      - $ref: '#/components/parameters/RedisKeyPath'
+      responses:
+        '200':
+          description: Clave eliminada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key:
+                    type: string
+                  deleted:
+                    type: boolean
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+      - ApiKeyAuth: []
+
+  /redis/all/keys:
+    get:
+      tags:
+      - Cache (Internal)
+      summary: Inspección completa de Redis BullMQ
+      description: |
+        **Debug avanzado** - Obtiene todas las claves relacionadas con BullMQ 
+        y sus valores clasificados por tipo de estructura Redis.
+      operationId: getAllRedisKeys
+      responses:
+        '200':
+          description: Estructura completa de claves BullMQ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RedisAllKeysResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+      - ApiKeyAuth: []
+
+  /redis/all/events:
+    get:
+      tags:
+      - Cache (Internal)
+      summary: Streams de eventos Redis
+      description: |
+        **Event Sourcing** - Obtiene todos los streams de eventos de Redis 
+        para análisis del flujo de eventos del sistema.
+      operationId: getAllRedisEvents
+      responses:
+        '200':
+          description: Streams de eventos del sistema
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RedisEventsResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+      - ApiKeyAuth: []
+
+components:
+  schemas:
+    # Esquemas de Request
+    CreateTaskRequest:
+      type: object
+      description: |
+        **Request para crear nueva tarea**
+
+        Debe incluir exactamente UNA fuente de imagen (imagePath O imageUrl).
+      properties:
+        imagePath:
+          type: string
+          description: |
+            **Path local al archivo de imagen**
+
+            Ruta absoluta o relativa al archivo en el servidor.
+          example: "/app/storage/images/input/existing-image.jpg"
+          minLength: 1
+          maxLength: 500
+        imageUrl:
+          type: string
+          format: uri
+          description: |
+            **URL remota de la imagen**
+
+            URL pública accesible desde el servidor para descarga automática.
+          example: "https://picsum.photos/2000/1500.jpg"
+          maxLength: 2048
+      oneOf:
+      - required: [ imagePath ]
+        title: "Crear desde path local"
+      - required: [ imageUrl ]
+        title: "Crear desde URL remota"
+      additionalProperties: false
+
+    # Esquemas de Response
+    CreateTaskResponse:
+      type: object
+      description: |
+        **Respuesta de tarea creada**
+
+        Información inicial de la tarea recién creada y encolada.
+      required: [ taskId, status, price ]
+      properties:
+        taskId:
+          type: string
+          description: ID único de MongoDB (ObjectId)
+          pattern: '^[a-f0-9]{24}$'
+          example: "65d4a54b89c5e342b2c2c5f6"
+        status:
+          type: string
+          enum: [ pending ]
+          description: Estado inicial siempre 'pending'
+          example: "pending"
+        price:
+          type: number
+          format: double
+          description: Precio aleatorio asignado automáticamente
+          minimum: 5
+          maximum: 50
+          example: 25.5
+
+    TaskResponse:
+      type: object
+      description: |
+        **Representación completa de una tarea**
+
+        Estructura unificada para cualquier estado de tarea con campos condicionales.
+      required: [ taskId, status, price ]
+      properties:
+        taskId:
+          type: string
+          description: Identificador único de la tarea
+          pattern: '^[a-f0-9]{24}$'
+          example: "65d4a54b89c5e342b2c2c5f6"
+        status:
+          $ref: '#/components/schemas/TaskStatus'
+        price:
+          type: number
+          format: double
+          description: Precio asignado a la tarea (5-50)
+          minimum: 5
+          maximum: 50
+          example: 25.5
+        images:
+          type: array
+          description: |
+            **Imágenes procesadas** (solo presente si status = 'completed')
+
+            Array con las variantes generadas por el worker.
+          items:
+            $ref: '#/components/schemas/ProcessedImage'
+        error:
+          type: string
+          description: |
+            **Mensaje de error** (solo presente si status = 'failed')
+
+            Descripción detallada del error ocurrido durante el procesamiento.
+          example: "Error procesando imagen: Formato de archivo corrupto"
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp de creación de la tarea
+          example: "2024-06-01T12:00:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Timestamp de última actualización
+          example: "2024-06-01T12:10:00Z"
+
+    TaskListResponse:
+      type: object
+      description: Lista paginada de tareas con metadatos de paginación
+      required: [ data, pagination ]
+      properties:
+        data:
+          type: array
+          description: Array de tareas en la página actual
+          items:
+            $ref: '#/components/schemas/TaskResponse'
+        pagination:
+          $ref: '#/components/schemas/PaginationInfo'
+
+    TaskPendingResponse:
+      allOf:
+      - $ref: '#/components/schemas/TaskResponse'
+      - type: object
+        description: Tarea específicamente en estado 'pending'
+        properties:
+          status:
+            type: string
+            enum: [ pending ]
+
+    # Esquemas de Entidades
+    ProcessedImage:
+      type: object
+      description: |
+        **Imagen procesada por el worker**
+
+        Representa una variante de resolución específica generada por Sharp.
+      required: [ resolution, path ]
+      properties:
+        resolution:
+          type: string
+          enum: [ "1024", "800" ]
+          description: |
+            **Resolución de la imagen procesada**
+
+            - 1024: Ancho de 1024px (aspect ratio preservado)
+            - 800: Ancho de 800px (aspect ratio preservado)
+          example: "1024"
+        path:
+          type: string
+          description: |
+            **Path relativo a la imagen procesada**
+
+            Formato: `/storage/images/{taskId}/{resolution}/{md5}.{ext}`
+          example: "/output/image1/1024/f322b730b287da77e1c519c7ffef4fc2.jpg"
+          maxLength: 500
+
+    TaskStatus:
+      type: string
+      enum: [ pending, processing, completed, failed ]
+      description: |
+        **Estados del ciclo de vida de una tarea**
+
+        - **pending**: Creada, esperando procesamiento
+        - **processing**: Worker está procesando
+        - **completed**: Procesamiento exitoso
+        - **failed**: Error durante procesamiento
+
+    PaginationInfo:
+      type: object
+      description: Metadatos de paginación para listas
+      required: [ page, limit, total, totalPages ]
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          description: Página actual
+          example: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: Elementos por página
+          example: 10
+        total:
+          type: integer
+          minimum: 0
+          description: Total de elementos disponibles
+          example: 45
+        totalPages:
+          type: integer
+          minimum: 0
+          description: Total de páginas disponibles
+          example: 5
+
+    # Esquemas de Queue y Cache
+    QueueStats:
+      type: object
+      description: Estadísticas en tiempo real de la cola BullMQ
+      properties:
+        waiting:
+          type: integer
+          description: Trabajos esperando procesamiento
+          example: 5
+        active:
+          type: integer
+          description: Trabajos actualmente siendo procesados
+          example: 2
+        completed:
+          type: integer
+          description: Trabajos completados exitosamente
+          example: 128
+        failed:
+          type: integer
+          description: Trabajos que fallaron
+          example: 3
+        delayed:
+          type: integer
+          description: Trabajos retrasados programáticamente
+          example: 0
+        paused:
+          type: integer
+          description: Trabajos pausados
+          example: 0
+
+    QueueJob:
+      type: object
+      description: Información detallada de un trabajo en cola
+      properties:
+        id:
+          type: string
+          description: ID único del trabajo
+          example: "job-123"
+        name:
+          type: string
+          description: Nombre del trabajo
+          example: "process-image"
+        data:
+          type: object
+          description: Datos del trabajo
+          properties:
+            taskId:
+              type: string
+              example: "65d4a54b89c5e342b2c2c5f6"
+            imagePath:
+              type: string
+              example: "/storage/images/65d4a54b89c5e342b2c2c5f6/original.jpg"
+            timestamp:
+              type: number
+              example: 1609459200000
+        returnvalue:
+          type: object
+          description: Valor de retorno (si completado)
+        failedReason:
+          type: string
+          description: Razón del fallo (si falló)
+        timestamp:
+          type: number
+          description: Timestamp de creación del trabajo
+        attemptsMade:
+          type: integer
+          description: Número de intentos realizados
+
+    RedisKeysResponse:
+      type: object
+      properties:
+        pattern:
+          type: string
+          description: Patrón utilizado para la búsqueda
+        count:
+          type: integer
+          description: Número de claves encontradas
+        keys:
+          type: array
+          items:
+            type: string
+          description: Lista de claves que coinciden con el patrón
+
+    RedisValueResponse:
+      type: object
+      properties:
+        key:
+          type: string
+          description: Clave consultada
+        value:
+          description: Valor parseado (JSON o string)
+          oneOf:
+          - type: object
+          - type: string
+          - type: number
+          - type: boolean
+
+    RedisDeleteResponse:
+      type: object
+      properties:
+        pattern:
+          type: string
+          description: Patrón utilizado para eliminar
+        deleted:
+          type: integer
+          description: Número de claves eliminadas
+
+    RedisAllKeysResponse:
+      type: object
+      properties:
+        keys:
+          type: object
+          properties:
+            info:
+              type: array
+              items:
+                type: object
+                properties:
+                  key:
+                    type: string
+                  type:
+                    type: string
+                    enum: [ hash, list, set, zset, string ]
+                  value:
+                    description: Valor según el tipo de estructura
+            count:
+              type: integer
+
+    RedisEventsResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+          description: Número de streams de eventos
+        eventStreams:
+          type: array
+          items:
+            type: object
+            properties:
+              streamKey:
+                type: string
+                description: Clave del stream de eventos
+              events:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      description: ID del evento en el stream
+                    data:
+                      type: object
+                      description: Datos del evento
+
+    # Esquemas de Error
+    ErrorResponse:
+      type: object
+      description: |
+        **Estructura estándar de error**
+
+        Formato unificado para todos los errores de la API.
+      required: [ error, message, statusCode ]
+      properties:
+        error:
+          type: string
+          description: Código de error único
+          example: "TASK_NOT_FOUND"
+        message:
+          type: string
+          description: Mensaje descriptivo del error
+          example: "La tarea con ID 65d4a54b89c5e342b2c2c5f6 no existe"
+        statusCode:
+          type: integer
+          description: Código de estado HTTP
+          example: 404
+        details:
+          type: object
+          description: Información adicional del error (opcional)
+          additionalProperties: true
+
+  # Parámetros Reutilizables
+  parameters:
+    IdempotencyKey:
+      name: X-Idempotency-Key
+      in: header
+      description: |
+        **Clave de idempotencia** para operaciones de escritura.
+
+        Previene la creación duplicada de tareas al reintentar requests.
+        Se recomienda usar UUIDs únicos por operación.
+      required: false
+      schema:
+        type: string
+        format: uuid
+        example: "123e4567-e89b-12d3-a456-426614174000"
+
+    TaskId:
+      name: taskId
+      in: path
+      required: true
+      description: |
+        **Identificador único de tarea**
+
+        ObjectId de MongoDB en formato hexadecimal de 24 caracteres.
+      schema:
+        type: string
+        pattern: '^[a-f0-9]{24}$'
+        example: "65d4a54b89c5e342b2c2c5f6"
+
+    JobId:
+      name: id
+      in: path
+      required: true
+      description: ID del trabajo en la cola BullMQ
+      schema:
+        type: string
+        example: "bull:image-processing:123"
+
+    JobState:
+      name: state
+      in: path
+      required: true
+      description: |
+        **Estado de trabajos BullMQ**
+
+        Estados del ciclo de vida de trabajos en la cola.
+      schema:
+        type: string
+        enum: [ waiting, active, completed, failed, delayed, paused ]
+        example: "waiting"
+
+    Page:
+      name: page
+      in: query
+      description: |
+        **Número de página** para paginación.
+
+        Comienza en 1. Si se omite, se usa página 1.
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+        example: 1
+
+    Limit:
+      name: limit
+      in: query
+      description: |
+        **Cantidad de elementos por página**.
+
+        Máximo 100 elementos. Si se omite, se usan 10.
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 10
+        example: 20
+
+    Status:
+      name: status
+      in: query
+      description: |
+        **Filtro por estado de tarea**.
+
+        Si se omite, se retornan tareas de todos los estados.
+      required: false
+      schema:
+        $ref: '#/components/schemas/TaskStatus'
+
+    RedisPattern:
+      name: pattern
+      in: query
+      description: |
+        **Patrón de búsqueda Redis** (sintaxis glob).
+
+        Ejemplos: `task:*`, `bull:*`, `idempotency:*`
+      required: false
+      schema:
+        type: string
+        default: "*"
+        example: "task:*"
+
+    RedisKey:
+      name: key
+      in: query
+      required: true
+      description: Clave específica de Redis a consultar
+      schema:
+        type: string
+        minLength: 1
+        example: "task:65d4a54b89c5e342b2c2c5f6"
+
+    RedisKeyPath:
+      name: key
+      in: path
+      required: true
+      description: Clave específica de Redis a eliminar
+      schema:
+        type: string
+        minLength: 1
+        example: "task:65d4a54b89c5e342b2c2c5f6"
+
+  # Respuestas Estándar
+  responses:
+    BadRequest:
+      description: |
+        **Petición inválida**
+
+        Error de validación en parámetros, cuerpo o headers de la petición.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            validation:
+              summary: Error de validación
+              value:
+                error: "VALIDATION_ERROR"
+                message: "Se requiere imagePath o imageUrl"
+                statusCode: 400
+            invalidParam:
+              summary: Parámetro inválido
+              value:
+                error: "PARAM_VALIDATION_ERROR"
+                message: "taskId debe ser un ObjectId válido"
+                statusCode: 400
+
+    NotFound:
+      description: |
+        **Recurso no encontrado**
+
+        La tarea solicitada no existe en la base de datos.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            taskNotFound:
+              summary: Tarea no encontrada
+              value:
+                error: "TASK_NOT_FOUND"
+                message: "La tarea con ID 65d4a54b89c5e342b2c2c5f6 no existe"
+                statusCode: 404
+
+    PayloadTooLarge:
+      description: |
+        **Archivo demasiado grande**
+
+        El archivo subido excede el límite de 10MB configurado en Multer.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            fileTooLarge:
+              summary: Archivo demasiado grande
+              value:
+                error: "FILE_TOO_LARGE"
+                message: "El archivo excede el tamaño máximo de 10MB"
+                statusCode: 413
+
+    UnprocessableEntity:
+      description: |
+        **Entidad no procesable**
+
+        Error de lógica de negocio o formato de archivo no soportado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            missingSource:
+              summary: Fuente de imagen faltante
+              value:
+                error: "MISSING_IMAGE_SOURCE"
+                message: "Se requiere imagePath, imageUrl o archivo"
+                statusCode: 400
+            invalidRetry:
+              summary: Retry inválido
+              value:
+                error: "INVALID_RETRY_STATE"
+                message: "Solo se pueden reintentar tareas fallidas. Estado actual: completed"
+                statusCode: 400
+
+    InternalServerError:
+      description: |
+        **Error interno del servidor**
+
+        Error inesperado en el sistema. Contacte al administrador si persiste.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            serverError:
+              summary: Error interno
+              value:
+                error: "INTERNAL_SERVER_ERROR"
+                message: "Ocurrió un error inesperado en el servidor"
+                statusCode: 500
+
+  # Esquemas de Seguridad
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        **Autenticación por API Key**
+        Incluya su API key en el header `X-API-Key` para acceder a los endpoints.
+        Para desarrollo local use: `development-key`
+
+# Seguridad Global
+security:
+- ApiKeyAuth: []
+
+# Información Adicional
+externalDocs:
+  description: Documentación técnica completa
+  url: https://github.com/jmrg-link/poc-backend-kairosds/blob/main/README.md
