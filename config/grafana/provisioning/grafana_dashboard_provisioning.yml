@@ -1,0 +1,24 @@
+apiVersion: 1
+
+providers:
+  # Image Processing API Dashboard
+  - name: 'image-api-dashboards'
+    orgId: 1
+    folder: 'Image Processing'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+
+  # System dashboards
+  - name: 'system-dashboards'
+    orgId: 1
+    folder: 'System'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/system

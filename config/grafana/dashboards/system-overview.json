@@ -1,0 +1,219 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "system-overview",
+    "title": "🏗️ JMRG PoC Kairos - System Overview",
+    "tags": ["system", "overview", "poc", "infrastructure"],
+    "timezone": "Europe/Madrid",
+    "refresh": "10s",
+    "schemaVersion": 39,
+    "version": 1,
+    "time": {
+      "from": "now-30m",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "🚀 Services Health Status",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 24, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "up{job=~\"traefik|prometheus|api-backend\"}",
+            "datasource": {"uid": "prometheus-ds"},
+            "legendFormat": "{{job}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {"type": "value", "value": "0", "text": "DOWN", "color": "red"},
+              {"type": "value", "value": "1", "text": "UP", "color": "green"}
+            ],
+            "color": {"mode": "thresholds"}
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "📡 API Request Rate",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 4},
+        "targets": [
+          {
+            "expr": "rate(traefik_service_requests_total{service=\"api@docker\"}[5m])",
+            "datasource": {"uid": "prometheus-ds"},
+            "legendFormat": "Requests/sec"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "⏱️ API Response Time",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 4},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(traefik_service_request_duration_seconds_bucket{service=\"api@docker\"}[5m]))",
+            "datasource": {"uid": "prometheus-ds"},
+            "legendFormat": "95th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(traefik_service_request_duration_seconds_bucket{service=\"api@docker\"}[5m]))",
+            "datasource": {"uid": "prometheus-ds"},
+            "legendFormat": "50th percentile"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "🔄 BullMQ Queue Status",
+        "type": "bargauge",
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 10},
+        "targets": [
+          {
+            "command": "LLEN",
+            "keyName": "bull:image-processing:waiting",
+            "datasource": {"uid": "redis-ds"},
+            "legendFormat": "Waiting"
+          },
+          {
+            "command": "LLEN", 
+            "keyName": "bull:image-processing:active",
+            "datasource": {"uid": "redis-ds"},
+            "legendFormat": "Active"
+          },
+          {
+            "command": "LLEN",
+            "keyName": "bull:image-processing:completed",
+            "datasource": {"uid": "redis-ds"},
+            "legendFormat": "Completed"
+          },
+          {
+            "command": "LLEN",
+            "keyName": "bull:image-processing:failed", 
+            "datasource": {"uid": "redis-ds"},
+            "legendFormat": "Failed"
+          }
+        ],
+        "options": {
+          "orientation": "horizontal",
+          "barRadius": 0.5,
+          "xTickLabelRotation": 0,
+          "xTickLabelSpacing": 100
+        }
+      },
+      {
+        "id": 5,
+        "title": "📈 HTTP Status Distribution",
+        "type": "piechart",
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 10},
+        "targets": [
+          {
+            "expr": "sum by (code) (rate(traefik_service_requests_total{service=\"api@docker\"}[1h]))",
+            "datasource": {"uid": "prometheus-ds"},
+            "legendFormat": "{{code}}"
+          }
+        ],
+        "options": {
+          "pieType": "donut",
+          "legend": {"displayMode": "table", "placement": "right"}
+        }
+      },
+      {
+        "id": 6,
+        "title": "💾 Database Connections",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 10},
+        "targets": [
+          {
+            "expr": "mongodb_connections{type=\"current\"}",
+            "datasource": {"uid": "prometheus-ds"},
+            "legendFormat": "MongoDB Active"
+          },
+          {
+            "command": "INFO",
+            "section": "clients",
+            "datasource": {"uid": "redis-ds"},
+            "legendFormat": "Redis Connections"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "📋 Recent API Logs",
+        "type": "logs",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "{app=\"image-express-api\"} | json | line_format \"{{.level}} | {{.message}}\"",
+            "datasource": {"uid": "loki-ds"}
+          }
+        ],
+        "options": {
+          "showTime": true,
+          "showLabels": false,
+          "enableLogDetails": true,
+          "sortOrder": "Descending"
+        }
+      },
+      {
+        "id": 8,
+        "title": "⚡ Worker Events Stream",
+        "type": "logs",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "{app=\"image-express-api\"} |= \"task.\" | json | line_format \"🎯 {{.taskId}} → {{.eventType}}\"",
+            "datasource": {"uid": "loki-ds"}
+          }
+        ],
+        "options": {
+          "showTime": true,
+          "showLabels": true,
+          "enableLogDetails": true
+        }
+      },
+      {
+        "id": 9,
+        "title": "🔢 Key Metrics Summary",
+        "type": "table",
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "rate(traefik_service_requests_total{service=\"api@docker\"}[1h])",
+            "format": "table",
+            "datasource": {"uid": "prometheus-ds"}
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {},
+              "indexByName": {},
+              "renameByName": {
+                "code": "Status Code",
+                "Value": "Rate/hour"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "🧠 Memory & CPU Usage",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 24},
+        "targets": [
+          {
+            "expr": "container_memory_usage_bytes{name=~\"poc-.*\"} / 1024 / 1024",
+            "datasource": {"uid": "prometheus-ds"},
+            "legendFormat": "{{name}} Memory MB"
+          }
+        ]
+      }
+    ]
+  }
+}

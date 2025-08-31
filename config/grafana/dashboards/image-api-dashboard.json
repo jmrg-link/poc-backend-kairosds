@@ -1,0 +1,253 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "image-api-dashboard",
+    "title": "🖼️ Image Processing API - Dashboard POC",
+    "tags": ["image-processing", "api", "poc", "kairos"],
+    "timezone": "Europe/Madrid",
+    "refresh": "30s",
+    "schemaVersion": 39,
+    "version": 1,
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "📊 API Status Overview",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "rate(traefik_service_requests_total{service=\"api@docker\"}[5m])",
+            "legendFormat": "Requests/sec",
+            "datasource": {"uid": "prometheus-ds"}
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "custom": {"displayMode": "list", "orientation": "horizontal"},
+            "mappings": [],
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "red", "value": 80}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "textMode": "auto"
+        }
+      },
+      {
+        "id": 2,
+        "title": "🔴 Error Rates by Status Code",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "rate(traefik_service_requests_total{service=\"api@docker\"}[5m]) by (code)",
+            "legendFormat": "Status {{code}}",
+            "datasource": {"uid": "prometheus-ds"}
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "barAlignment": 0,
+              "lineWidth": 1,
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "spanNulls": false,
+              "insertNulls": false,
+              "showPoints": "auto",
+              "pointSize": 5
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "📝 Application Logs - Real Time",
+        "type": "logs",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 6},
+        "targets": [
+          {
+            "expr": "{app=\"image-express-api\"} | json | line_format \"{{.timestamp}} [{{.level}}] {{.message}}\"",
+            "datasource": {"uid": "loki-ds"}
+          }
+        ],
+        "options": {
+          "showTime": true,
+          "showLabels": false,
+          "showCommonLabels": false,
+          "wrapLogMessage": false,
+          "prettifyLogMessage": false,
+          "enableLogDetails": true,
+          "dedupStrategy": "none",
+          "sortOrder": "Descending"
+        }
+      },
+      {
+        "id": 4,
+        "title": "⚡ Task Events - Worker Activity",
+        "type": "logs",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14},
+        "targets": [
+          {
+            "expr": "{app=\"image-express-api\"} |= \"task.\" | json | line_format \"🎯 {{.taskId}} → {{.eventType}} ({{.timestamp}})\"",
+            "datasource": {"uid": "loki-ds"}
+          }
+        ],
+        "options": {
+          "showTime": true,
+          "showLabels": true,
+          "wrapLogMessage": true,
+          "enableLogDetails": true
+        }
+      },
+      {
+        "id": 5,
+        "title": "📈 HTTP Status Codes Distribution",
+        "type": "piechart",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14},
+        "targets": [
+          {
+            "expr": "sum by (code) (rate(traefik_service_requests_total{service=\"api@docker\"}[1h]))",
+            "legendFormat": "{{code}}",
+            "datasource": {"uid": "prometheus-ds"}
+          }
+        ],
+        "options": {
+          "pieType": "donut",
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "values": ["percent"]
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "🔄 Queue Metrics - BullMQ Status",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 22},
+        "targets": [
+          {
+            "command": "LLEN",
+            "keyName": "bull:image-processing:waiting",
+            "datasource": {"uid": "redis-ds"}
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 10},
+                {"color": "red", "value": 50}
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto"
+        }
+      },
+      {
+        "id": 7,
+        "title": "⚙️ Processing Time - Task Duration",
+        "type": "timeseries", 
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 22},
+        "targets": [
+          {
+            "expr": "{app=\"image-express-api\"} |= \"Job completed\" | json | unwrap duration_ms | rate(5m)",
+            "datasource": {"uid": "loki-ds"}
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "💾 Storage Usage",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 22},
+        "targets": [
+          {
+            "expr": "node_filesystem_size_bytes{mountpoint=\"/app/storage\"}",
+            "legendFormat": "Total Space",
+            "datasource": {"uid": "prometheus-ds"}
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "🎯 Task Creation Rate",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 28},
+        "targets": [
+          {
+            "expr": "{app=\"image-express-api\"} |= \"POST /api/v1/tasks 201\" | rate(1m)",
+            "datasource": {"uid": "loki-ds"},
+            "legendFormat": "Tasks Created/min"
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "🔍 Error Logs - Last 50 Errors",
+        "type": "logs",
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 28},
+        "targets": [
+          {
+            "expr": "{app=\"image-express-api\"} |= \"ERROR\" | json | line_format \"❌ {{.message}} ({{.timestamp}})\"",
+            "datasource": {"uid": "loki-ds"}
+          }
+        ],
+        "maxDataPoints": 50
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "task_id",
+          "type": "textbox",
+          "label": "Task ID",
+          "description": "MongoDB ObjectId de la tarea",
+          "query": "",
+          "current": {
+            "value": "",
+            "text": ""
+          }
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "Task Events",
+          "datasource": {"uid": "loki-ds"},
+          "expr": "{app=\"image-express-api\"} |= \"task.\" | json",
+          "titleFormat": "{{eventType}}",
+          "textFormat": "Task: {{taskId}}",
+          "tagKeys": "taskId,eventType",
+          "enable": true
+        }
+      ]
+    }
+  }
+}
