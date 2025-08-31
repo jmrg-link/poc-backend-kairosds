@@ -1,16 +1,26 @@
-.vscode
-.sfdx
+# VSCode / SFDX / entornos
+.vscode/
+.sfdx/
 .env
 
+# Builds y dependencias
 /dist
 /node_modules
 
+# Scripts locales
 /scripts/init-mongo.js
-/data/traefik/acme/acme.json
 
+# Traefik ACME
+/data/traefik/acme/*
+!/data/traefik/acme/.gitkeep
+
+# Store
 store/images/*
 !store/images/.gitkeep
+
+# Logs Traefik
 logs/traefik/*
 !logs/traefik/.gitkeep
 
+# Coverage
 /coverage
