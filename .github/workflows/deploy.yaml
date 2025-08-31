@@ -2,7 +2,6 @@
 # CI/CD – Build de API y Worker → GHCR + Deploy por SSH con docker compose
 # =============================================================================
 name: ci-cd
-
 on:
   push:
     branches: ["main"]
@@ -87,36 +86,38 @@ jobs:
     runs-on: ubuntu-latest
     concurrency: deploy-${{ github.ref }}
     steps:
+      - name: ⬇️ Checkout
+        uses: actions/checkout@v4
+
       - name: 📦 Copiar archivos (SCP)
-        uses: appleboy/scp-action@v1
+        uses: appleboy/scp-action@v0.1.5
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
-          # host_fingerprint: ${{ secrets.SSH_HOST_FINGERPRINT }}
           source: |
             docker-compose.yml
             deploy/docker-compose.prod.yml
-            config/**
-            data/traefik/acme
+            config/
+            scripts/
           target: ${{ secrets.DEPLOY_PATH }}
 
       - name: 🚀 Desplegar (SSH)
-        uses: appleboy/ssh-action@v1.2.2
+        uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
-          # passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          # host_fingerprint: ${{ secrets.SSH_HOST_FINGERPRINT }}
           script: |
             set -euo pipefail
             cd "${{ secrets.DEPLOY_PATH }}"
 
+            # Verificar que existe el archivo .env con las credenciales
             test -f .env || { echo "❌ Falta .env en $PWD"; exit 1; }
 
+            # Crear estructura de directorios necesaria
             if [ ! -d data/traefik/acme ]; then
               echo "⚠️  No existe data/traefik/acme — creando…"
               mkdir -p data/traefik/acme || { echo "❌ No pude crear data/traefik/acme"; exit 1; }
@@ -126,11 +127,47 @@ jobs:
             fi
             chmod 600 data/traefik/acme/acme.json || { echo "❌ No pude aplicar chmod 600 a acme.json"; exit 1; }
 
+            # Crear directorios de storage si no existen
+            mkdir -p storage/images/{input,output}
+            mkdir -p logs
+
+            # =======================================================================
+            # DETERMINACIÓN DEL TAG DE IMAGEN
+            # =======================================================================
+            # Estrategia de versionado:
+            # - Branch 'main': usa tag 'latest' para producción estable
+            # - Otras branches: usa SHA corto del commit (ej: abc1234) para testing
+            # 
+            # Esto permite:
+            # 1. Rollback fácil en producción usando SHA específicos
+            # 2. Testing de features en desarrollo con tags únicos
+            # 3. Identificación clara de qué versión está desplegada
+            # =======================================================================
+            
             SHORT_SHA="$(echo "${{ github.sha }}" | cut -c1-7)"
-            if [ "${{ github.ref_name }}" = "main" ]; then IMAGE_TAG=latest; else IMAGE_TAG="$SHORT_SHA"; fi
+            
+            if [ "${{ github.ref_name }}" = "main" ]; then 
+              IMAGE_TAG="latest"
+              echo "✅ Desplegando a producción con tag: latest"
+            else 
+              IMAGE_TAG="$SHORT_SHA"
+              echo "🧪 Desplegando branch de desarrollo con tag: $SHORT_SHA"
+            fi
+            
             export IMAGE_TAG
 
+            # Login a GitHub Container Registry
             echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Pull de las nuevas imágenes
             docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml pull
+
+            # Deploy con zero-downtime (--remove-orphans limpia contenedores huérfanos)
             docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --remove-orphans
+
+            # Limpieza de imágenes antiguas
             docker image prune -f
+
+            # Verificación del deploy
+            echo "📊 Estado de los servicios:"
+            docker compose ps

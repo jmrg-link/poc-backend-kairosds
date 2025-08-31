@@ -1,0 +1,85 @@
+# deploy/docker-compose.prod.yml
+# Override para producción - usa imágenes de GHCR y configuración hardened
+
+services:
+  # ========= Traefik - Configuración de producción =========
+  traefik:
+    restart: always
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=proxy"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.http3=true"
+      - "--certificatesresolvers.le.acme.email=${SSL_EMAIL}"
+      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.le.acme.httpchallenge=true"
+      - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
+      - "--log.level=WARN"
+      - "--accesslog=true"
+      - "--accesslog.format=json"
+      - "--api.dashboard=true"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+
+  # ========= API - Usar imagen de GHCR =========
+  api-backend:
+    image: ghcr.io/jmrg-link/poc-backend-kairosds/image-express-api:${IMAGE_TAG:-latest}
+    restart: always
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: warn
+      ENABLE_SWAGGER: "false"
+
+  # ========= Worker - Usar imagen de GHCR =========
+  worker:
+    image: ghcr.io/jmrg-link/poc-backend-kairosds/image-processing-worker:${IMAGE_TAG:-latest}
+    restart: always
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: warn
+
+  # ========= MongoDB - Optimización producción =========
+  mongodb:
+    restart: always
+    command: >
+      mongod
+      --quiet
+      --bind_ip_all
+      --auth
+      --oplogSize 2048
+      --wiredTigerCacheSizeGB 1
+
+  # ========= Redis - Optimización producción =========
+  redis:
+    restart: always
+    command: >
+      redis-server
+      --maxmemory 768mb
+      --maxmemory-policy allkeys-lru
+      --requirepass ${REDIS_PASSWORD}
+      --save 900 1
+      --save 300 10
+      --appendonly yes
+      --appendfsync everysec
+
+  # ========= Loki - Configuración producción =========
+  loki:
+    restart: always
+
+  # ========= Prometheus - Sin puerto expuesto =========
+  prometheus:
+    restart: always
+    ports: []
+
+  # ========= Grafana - Sin puerto expuesto =========
+  grafana:
+    restart: always
+    ports: []
+    environment:
+      GF_SERVER_ROOT_URL: https://grafana.${DOMAIN}
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_SECURITY_COOKIE_SAMESITE: strict
+      GF_LOG_LEVEL: warn
