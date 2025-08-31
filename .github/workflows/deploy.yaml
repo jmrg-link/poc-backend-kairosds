@@ -1,0 +1,173 @@
+# =============================================================================
+# CI/CD – Build de API y Worker → GHCR + Deploy por SSH con docker compose
+# =============================================================================
+name: ci-cd
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+env:
+  IMAGE_API: ghcr.io/${{ github.repository }}/image-express-api
+  IMAGE_WORKER: ghcr.io/${{ github.repository }}/image-processing-worker
+
+jobs:
+  # ===========================================================================
+  # 1) BUILD & PUSH – Publica imágenes en GHCR (API y Worker)
+  # ===========================================================================
+  build-and-push:
+    name: Build & Push images (GHCR)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: ⬇️ Checkout
+        uses: actions/checkout@v4
+
+      - name: 🧱 Setup Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔐 Login GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # -------- API --------
+      - name: 🏷️ Meta (API)
+        id: meta_api
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_API }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short
+
+      - name: 🏗️ Build & Push (API)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./image-express-api
+          file: ./image-express-api/Dockerfile
+          push: true
+          tags: ${{ steps.meta_api.outputs.tags }}
+          labels: ${{ steps.meta_api.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # -------- Worker --------
+      - name: 🏷️ Meta (Worker)
+        id: meta_worker
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_WORKER }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short
+
+      - name: 🏗️ Build & Push (Worker)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./image-processing-worker
+          file: ./image-processing-worker/Dockerfile
+          push: true
+          tags: ${{ steps.meta_worker.outputs.tags }}
+          labels: ${{ steps.meta_worker.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ===========================================================================
+  # 2) DEPLOY – Copia archivos al VPS y levanta con compose (override prod)
+  # ===========================================================================
+  deploy:
+    name: Deploy to VPS (docker compose)
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    concurrency: deploy-${{ github.ref }}
+    steps:
+      - name: ⬇️ Checkout
+        uses: actions/checkout@v4
+
+      - name: 📦 Copiar archivos (SCP)
+        uses: appleboy/scp-action@v0.1.5
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          source: |
+            docker-compose.yml
+            deploy/docker-compose.prod.yml
+            config/
+            scripts/
+          target: ${{ secrets.DEPLOY_PATH }}
+
+      - name: 🚀 Desplegar (SSH)
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            set -euo pipefail
+            cd "${{ secrets.DEPLOY_PATH }}"
+
+            # Verificar que existe el archivo .env con las credenciales
+            test -f .env || { echo "❌ Falta .env en $PWD"; exit 1; }
+
+            # Crear estructura de directorios necesaria
+            if [ ! -d data/traefik/acme ]; then
+              echo "⚠️  No existe data/traefik/acme — creando…"
+              mkdir -p data/traefik/acme || { echo "❌ No pude crear data/traefik/acme"; exit 1; }
+            fi
+            if [ ! -f data/traefik/acme/acme.json ]; then
+              echo "{}" > data/traefik/acme/acme.json || { echo "❌ No pude crear acme.json"; exit 1; }
+            fi
+            chmod 600 data/traefik/acme/acme.json || { echo "❌ No pude aplicar chmod 600 a acme.json"; exit 1; }
+
+            # Crear directorios de storage si no existen
+            mkdir -p storage/images/{input,output}
+            mkdir -p logs
+
+            # =======================================================================
+            # DETERMINACIÓN DEL TAG DE IMAGEN
+            # =======================================================================
+            # Estrategia de versionado:
+            # - Branch 'main': usa tag 'latest' para producción estable
+            # - Otras branches: usa SHA corto del commit (ej: abc1234) para testing
+            # 
+            # Esto permite:
+            # 1. Rollback fácil en producción usando SHA específicos
+            # 2. Testing de features en desarrollo con tags únicos
+            # 3. Identificación clara de qué versión está desplegada
+            # =======================================================================
+            
+            SHORT_SHA="$(echo "${{ github.sha }}" | cut -c1-7)"
+            
+            if [ "${{ github.ref_name }}" = "main" ]; then 
+              IMAGE_TAG="latest"
+              echo "✅ Desplegando a producción con tag: latest"
+            else 
+              IMAGE_TAG="$SHORT_SHA"
+              echo "🧪 Desplegando branch de desarrollo con tag: $SHORT_SHA"
+            fi
+            
+            export IMAGE_TAG
+
+            # Login a GitHub Container Registry
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Pull de las nuevas imágenes
+            docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml pull
+
+            # Deploy con zero-downtime (--remove-orphans limpia contenedores huérfanos)
+            docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --remove-orphans
+
+            # Limpieza de imágenes antiguas
+            docker image prune -f
+
+            # Verificación del deploy
+            echo "📊 Estado de los servicios:"
+            docker compose ps

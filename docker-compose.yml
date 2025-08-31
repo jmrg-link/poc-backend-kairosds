@@ -100,7 +100,7 @@ services:
       QUEUE_MAX_RETRIES: 3
       STORAGE_INPUT_PATH: /app/storage/images/input
       STORAGE_OUTPUT_PATH: /app/storage/images/output
-      API_KEY: ${API_KEY:-development-key}
+      API_KEY: ${API_KEY}
       ENABLE_SWAGGER: true
       LOG_LEVEL: info
       LOKI_URL: http://loki:3100
@@ -177,17 +177,15 @@ services:
     container_name: poc-mongodb
     restart: unless-stopped
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-root}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
-      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-imagedb}
-    ports:
-      - "${MONGO_PORT:-27099}:27017"
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
     networks:
       - backend
     volumes:
       - mongodb_data:/data/db
       - mongodb_config:/data/configdb
-      - ./scripts/init-mongo.js:/docker-entrypoint-initdb.d/init.js:ro
+      - ./docker-entrypoint-initdb.d/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     command: >
         mongod
         --quiet
@@ -213,8 +211,6 @@ services:
       --save 900 1
       --save 300 10
       --appendonly yes
-    ports:
-      - "6379:6379"
     networks:
       - backend
     volumes:
@@ -230,8 +226,6 @@ services:
     image: grafana/loki:3.0.0
     container_name: poc-loki
     restart: unless-stopped
-    ports:
-      - "3100:3100"
     volumes:
       - ./config/loki/loki-config.yml:/etc/loki/local-config.yaml:ro
       - loki_data:/loki
@@ -249,8 +243,6 @@ services:
     image: prom/prometheus:v2.48.0
     container_name: poc-prometheus
     restart: unless-stopped
-    ports:
-      - "9090:9090"
     volumes:
       - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -262,6 +254,15 @@ services:
       - '--web.console.templates=/etc/prometheus/consoles'
     networks:
       - monitoring
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.${DOMAIN}`)"
+      - "traefik.http.routers.prometheus.entrypoints=websecure"
+      - "traefik.http.routers.prometheus.tls.certresolver=le"
+      - "traefik.http.routers.prometheus.middlewares=auth"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
       interval: 30s
@@ -274,13 +275,11 @@ services:
     container_name: poc-grafana
     restart: unless-stopped
     environment:
-      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
       - GF_INSTALL_PLUGINS=redis-datasource
       - GF_FEATURE_TOGGLES_ENABLE=publicDashboards
       - GF_LOG_LEVEL=info
-    ports:
-      - "3001:3000"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
@@ -309,17 +308,11 @@ services:
 # =============================================================================
 volumes:
   mongodb_data:
-    driver: local
   mongodb_config:
-    driver: local
   redis_data:
-    driver: local
   loki_data:
-    driver: local
   prometheus_data:
-    driver: local
   grafana_data:
-    driver: local
 
 # =============================================================================
 # REDES
