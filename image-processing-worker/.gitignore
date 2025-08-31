@@ -1,0 +1,6 @@
+.vscode
+.sfdx
+.env
+
+/dist
+/node_modules
