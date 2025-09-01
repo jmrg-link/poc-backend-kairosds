@@ -195,7 +195,7 @@ jobs:
       # STEP 3: Transfer Deployment Package
       # -----------------------------------------------------------------------
       - name: 📤 Transfer Files to Server
-        uses: appleboy/scp-action@v0.1.5
+        uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
@@ -253,24 +253,24 @@ jobs:
             # Domain and SSL
             DOMAIN=poc.jmrg.dev
             SSL_EMAIL=info@jmrg.dev
-            
-            # Database Configuration  
-            MONGO_USER=app_user_pro
-            MONGO_PASSWORD=vmx2XKH1dswtwR_ZiX2ieP-6U1lVkIvdYcw14YhcLIXXYqZ
-            MONGO_ROOT_USERNAME=app_user_pro
-            MONGO_ROOT_PASSWORD=vmx2XKH1dswtwR_ZiX2ieP-6U1lVkIvdYcw14YhcLIXXYqZ
+
+            # Database Configuration
+            MONGO_USER={{ secrets.MONGO_USER }}
+            MONGO_PASSWORD={{ secrets.MONGO_PASSWORD }}
+            MONGO_ROOT_USERNAME={{ secrets.MONGO_ROOT_USERNAME }}
+            MONGO_ROOT_PASSWORD={{ secrets.MONGO_ROOT_PASSWORD }}
             MONGO_DATABASE=imagedb
             
             # Redis Configuration
-            REDIS_PASSWORD=R1ysy0yd0dkjUq0kM8gCNwkuslSEEiieAPWPTVUPrY1245566ZZAdQ=
-            
+            REDIS_PASSWORD={{ secrets.REDIS_PASSWORD }}
+
             # Monitoring
-            GRAFANA_USER=admin
-            GRAFANA_PASSWORD=Tgqc1mW/pVL6BCvewEnwrtIxQ2GOOAYF+fF/W7/OoPY=
-            
+            GRAFANA_USER={{ secrets.GRAFANA_USER }}
+            GRAFANA_PASSWORD={{ secrets.GRAFANA_PASSWORD }}
+
             # Traefik Authentication
-            TRAEFIK_AUTH='admin:$$2y$$05$$NfKo3Zl9RPcv.6KqxS.ZW.JB8MSkplHymn8K707QN56W//27eAvAy'
-            
+            TRAEFIK_AUTH={{ secrets.TRAEFIK_AUTH }}
+
             # Application Settings
             NODE_ENV=production
             SERVER_PORT=3000
@@ -404,9 +404,9 @@ jobs:
             echo "🌐 Access URLs:"
             echo "  • API:        https://api.poc.jmrg.dev"
             echo "  • Swagger:    https://api.poc.jmrg.dev/api-docs"
-            echo "  • Traefik:    https://traefik.poc.jmrg.dev"    # CORREGIDO
-            echo "  • Grafana:    https://grafana.poc.jmrg.dev"    # CORREGIDO
-            echo "  • Prometheus: https://prometheus.poc.jmrg.dev"  # CORREGIDO
+            echo "  • Traefik:    https://traefik.api.poc.jmrg.dev"    # CORREGIDO
+            echo "  • Grafana:    https://grafana.api.poc.jmrg.dev"    # CORREGIDO
+            echo "  • Prometheus: https://prometheus.api.poc.jmrg.dev"  # CORREGIDO
             echo ""
             echo "📅 Deployment Details:"
             echo "  • Timestamp:  ${DEPLOY_TIMESTAMP}"

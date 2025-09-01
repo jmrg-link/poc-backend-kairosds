@@ -85,7 +85,7 @@ services:
     restart: always
     ports: []
     environment:
-      GF_SERVER_ROOT_URL: https://grafana.${DOMAIN}
+      GF_SERVER_ROOT_URL: https://grafana.api.${DOMAIN}
       GF_SECURITY_COOKIE_SECURE: "true"
       GF_SECURITY_COOKIE_SAMESITE: strict
       GF_LOG_LEVEL: info

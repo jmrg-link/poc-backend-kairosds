@@ -71,7 +71,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN}`)"  # CORREGIDO
+      - "traefik.http.routers.traefik.rule=Host(`traefik.api.${DOMAIN}`)"
       - "traefik.http.routers.traefik.entrypoints=websecure"
       - "traefik.http.routers.traefik.tls.certresolver=le"
       - "traefik.http.routers.traefik.service=api@internal"
@@ -261,7 +261,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.prometheus.rule=Host(`prometheus.${DOMAIN}`)"  # CORREGIDO
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.api.${DOMAIN}`)"
       - "traefik.http.routers.prometheus.entrypoints=websecure"
       - "traefik.http.routers.prometheus.tls.certresolver=le"
       - "traefik.http.routers.prometheus.middlewares=auth"
@@ -296,7 +296,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.grafana.rule=Host(`grafana.${DOMAIN}`)"  # CORREGIDO
+      - "traefik.http.routers.grafana.rule=Host(`grafana.api.${DOMAIN}`)"
       - "traefik.http.routers.grafana.entrypoints=websecure"
       - "traefik.http.routers.grafana.tls.certresolver=le"
       - "traefik.http.services.grafana.loadbalancer.server.port=3000"
