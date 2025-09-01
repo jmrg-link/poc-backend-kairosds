@@ -25,6 +25,11 @@ jobs:
       - name: ⬇️ Checkout
         uses: actions/checkout@v4
 
+      - name: ⏱️ Delay inicial para sincronización
+        run: |
+          echo "⏳ Esperando 30 segundos para asegurar sincronización completa del push..."
+          sleep 30
+
       - name: 🧱 Setup Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -77,8 +82,13 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: ⏱️ Esperar propagación de imágenes
+        run: |
+          echo "⏳ Esperando 15 segundos para propagación de imágenes en GHCR..."
+          sleep 15
+
   # ===========================================================================
-  # 2) DEPLOY – Copia archivos al VPS y levanta con compose (override prod)
+  # 2) DEPLOY – Copia archivos al VPS y levanta con compose
   # ===========================================================================
   deploy:
     name: Deploy to VPS (docker compose)
@@ -88,45 +98,13 @@ jobs:
     steps:
       - name: ⬇️ Checkout
         uses: actions/checkout@v4
-
-      # DEBUG: Verificar qué archivos existen después del checkout
-      - name: 🔍 Debug - Verificar archivos
+      - name: ⏱️ Pre-deploy delay
         run: |
-          echo "=== Directorio actual ==="
-          pwd
-          echo ""
-          echo "=== Archivos en raíz ==="
-          ls -la
-          echo ""
-          echo "=== Verificar archivos específicos ==="
-          test -f docker-compose.yml && echo "✅ docker-compose.yml EXISTE" || echo "❌ docker-compose.yml NO EXISTE"
-          echo ""
-          echo "=== Contenido de deploy/ ==="
-          ls -la deploy/ 2>/dev/null || echo "❌ deploy/ NO EXISTE"
-          echo ""
-          echo "=== Contenido de config/ ==="
-          ls -la config/ 2>/dev/null || echo "❌ config/ NO EXISTE"
-          echo ""
-          echo "=== Contenido de docker-entrypoint-initdb.d/ ==="
-          ls -la docker-entrypoint-initdb.d/ 2>/dev/null || echo "❌ docker-entrypoint-initdb.d/ NO EXISTE"
+          echo "⏳ Esperando 10 segundos antes del deploy para asegurar disponibilidad..."
+          sleep 10
 
-      # Opción 1: Crear tar manualmente (MÁS CONFIABLE)
-      - name: 📦 Crear archivo tar con los archivos de deploy
-        run: |
-          echo "Creando tar con archivos de configuración..."
-          tar -czf deploy-files.tar.gz \
-            docker-compose.yml \
-            deploy/ \
-            config/ \
-            docker-entrypoint-initdb.d/*.js 2>/dev/null || \
-          tar -czf deploy-files.tar.gz \
-            docker-compose.yml \
-            deploy/ \
-            config/
-          echo "Archivo tar creado: $(ls -lh deploy-files.tar.gz)"
-
-      - name: 📤 Copiar tar al servidor
-        uses: appleboy/scp-action@master
+      - name: 📦 Copiar archivos (SCP)
+        uses: appleboy/scp-action@v0.1.5
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
@@ -154,33 +132,72 @@ jobs:
             # Verificar que existe el archivo .env con las credenciales
             test -f .env || { echo "❌ Falta .env en $PWD"; exit 1; }
 
-            # Crear estructura de directorios necesaria
+            # =======================================================================
+            # CREAR ESTRUCTURA DE DIRECTORIOS COMPLETA
+            # =======================================================================
+            echo "📁 Creando estructura de directorios..."
+            
+            # Directorios de Traefik y certificados SSL
             if [ ! -d data/traefik/acme ]; then
-              echo "⚠️  No existe data/traefik/acme — creando…"
+              echo "  → Creando data/traefik/acme..."
               mkdir -p data/traefik/acme || { echo "❌ No pude crear data/traefik/acme"; exit 1; }
             fi
+            
             if [ ! -f data/traefik/acme/acme.json ]; then
               echo "{}" > data/traefik/acme/acme.json || { echo "❌ No pude crear acme.json"; exit 1; }
             fi
             chmod 600 data/traefik/acme/acme.json || { echo "❌ No pude aplicar chmod 600 a acme.json"; exit 1; }
 
-            # Crear directorios de storage si no existen
-            mkdir -p storage/images/{input,output}
-            mkdir -p logs
+            # =======================================================================
+            # DIRECTORIOS DE ALMACENAMIENTO SEGÚN REQUISITOS
+            # =======================================================================
+            echo "📂 Configurando directorios de almacenamiento..."
+            
+            # Estructura de storage para imágenes originales
+            mkdir -p storage/images/input || { echo "❌ Error creando storage/images/input"; exit 1; }
+            echo "  ✓ storage/images/input"
+            
+            # Directorio de salida para imágenes procesadas
+            mkdir -p output || { echo "❌ Error creando output"; exit 1; }
+            echo "  ✓ output"
+            
+            # Directorio temporal para procesamiento
+            mkdir -p temp || { echo "❌ Error creando temp"; exit 1; }
+            echo "  ✓ temp"
+            
+            # Logs separados por servicio
+            mkdir -p logs/{api,worker,traefik} || { echo "❌ Error creando directorios de logs"; exit 1; }
+            echo "  ✓ logs/{api,worker,traefik}"
+            
+            # Directorios de configuración si no existen
+            mkdir -p config/{loki,prometheus,grafana/{provisioning,dashboards}}
+            echo "  ✓ config/{loki,prometheus,grafana}"
+            
+            # Directorio para scripts de inicialización de MongoDB
+            mkdir -p docker-entrypoint-initdb.d
+            echo "  ✓ docker-entrypoint-initdb.d"
+
+            # =======================================================================
+            # PERMISOS DE DIRECTORIOS
+            # =======================================================================
+            echo "🔐 Configurando permisos..."
+            
+            # Si estamos en un sistema que soporta chown con UID específicos
+            if command -v chown >/dev/null 2>&1; then
+              # Intentar cambiar propietario a UID 1001 (nodeuser en contenedor)
+              chown -R 1001:1001 storage output temp logs 2>/dev/null || {
+                echo "  ⚠️  No se pudieron cambiar propietarios (requiere permisos root)"
+              }
+            fi
+            
+            # Asegurar permisos de escritura
+            chmod -R 755 storage output temp logs || {
+              echo "  ⚠️  No se pudieron cambiar permisos"
+            }
 
             # =======================================================================
             # DETERMINACIÓN DEL TAG DE IMAGEN
             # =======================================================================
-            # Estrategia de versionado:
-            # - Branch 'main': usa tag 'latest' para producción estable
-            # - Otras branches: usa SHA corto del commit (ej: abc1234) para testing
-            # 
-            # Esto permite:
-            # 1. Rollback fácil en producción usando SHA específicos
-            # 2. Testing de features en desarrollo con tags únicos
-            # 3. Identificación clara de qué versión está desplegada
-            # =======================================================================
-            
             SHORT_SHA="$(echo "${{ github.sha }}" | cut -c1-7)"
             
             if [ "${{ github.ref_name }}" = "main" ]; then 
@@ -194,17 +211,95 @@ jobs:
             export IMAGE_TAG
 
             # Login a GitHub Container Registry
+            echo "🔐 Login a GitHub Container Registry..."
             echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-            # Pull de las nuevas imágenes
-            docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml pull
+            # =======================================================================
+            # VERIFICAR DISPONIBILIDAD DE IMÁGENES CON REINTENTOS
+            # =======================================================================
+            echo "🔍 Verificando disponibilidad de imágenes..."
+            
+            MAX_RETRIES=5
+            RETRY_DELAY=10
+            
+            for i in $(seq 1 $MAX_RETRIES); do
+              echo "  Intento $i de $MAX_RETRIES..."
+              
+              if docker pull ghcr.io/${{ github.repository }}/image-express-api:${IMAGE_TAG} && \
+                 docker pull ghcr.io/${{ github.repository }}/image-processing-worker:${IMAGE_TAG}; then
+                echo "  ✅ Imágenes disponibles"
+                break
+              else
+                if [ $i -eq $MAX_RETRIES ]; then
+                  echo "  ❌ No se pudieron descargar las imágenes después de $MAX_RETRIES intentos"
+                  exit 1
+                fi
+                echo "  ⏳ Esperando $RETRY_DELAY segundos antes de reintentar..."
+                sleep $RETRY_DELAY
+              fi
+            done
 
-            # Deploy con zero-downtime (--remove-orphans limpia contenedores huérfanos)
-            docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --remove-orphans
+            # Pull de todas las imágenes del compose
+            echo "📥 Descargando todas las imágenes..."
+            docker compose pull
 
+            # =======================================================================
+            # DEPLOY CON ZERO-DOWNTIME
+            # =======================================================================
+            echo "🚀 Iniciando deploy..."
+            
+            # Deploy
+            docker compose up -d --remove-orphans
+
+            # Esperar a que los servicios estén listos
+            echo "⏳ Esperando que los servicios inicien (30 segundos)..."
+            sleep 30
+
+            # =======================================================================
+            # VERIFICACIÓN DEL DEPLOY
+            # =======================================================================
+            echo "📊 Verificando estado del deploy..."
+            
+            # Verificar que los servicios principales estén running
+            SERVICES_UP=$(docker compose ps --format "table {{.Service}}\t{{.Status}}" | grep -E "(api-backend|worker)" | grep -c "Up" || true)
+            
+            if [ "$SERVICES_UP" -lt 2 ]; then
+              echo "❌ Algunos servicios no están funcionando correctamente"
+              echo "📋 Estado actual de los servicios:"
+              docker compose ps
+              echo ""
+              echo "📋 Logs de los últimos errores:"
+              docker compose logs --tail=50 api-backend worker
+              exit 1
+            else
+              echo "✅ Servicios principales funcionando correctamente"
+            fi
+            
+            # Verificar health check de API si es posible
+            echo "🔍 Verificando health de API..."
+            if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/health | grep -q "200"; then
+              echo "  ✅ API respondiendo correctamente"
+            else
+              echo "  ⚠️  API no responde en health check (puede estar iniciando aún)"
+            fi
+            
             # Limpieza de imágenes antiguas
+            echo "🧹 Limpiando imágenes antiguas..."
             docker image prune -f
 
-            # Verificación del deploy
-            echo "📊 Estado de los servicios:"
+            # Mostrar estado final
+            echo ""
+            echo "📊 Estado final de los servicios:"
             docker compose ps
+            
+            # Mostrar URLs de acceso (URLs fijas conocidas)
+            echo ""
+            echo "🌐 URLs de acceso:"
+            echo "  → API: https://api.poc.jmrg.dev"
+            echo "  → Swagger: https://api.poc.jmrg.dev/api-docs"
+            echo "  → Traefik Dashboard: https://traefik.poc.jmrg.dev"
+            echo "  → Grafana: https://grafana.poc.jmrg.dev"
+            echo "  → Prometheus: https://prometheus.poc.jmrg.dev"
+            
+            echo ""
+            echo "✅ Deploy completado exitosamente a las $(date '+%Y-%m-%d %H:%M:%S')"

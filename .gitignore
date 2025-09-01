@@ -15,9 +15,21 @@
 store/images/*
 !store/images/.gitkeep
 
+# Store
+store/images/*
+!store/images/.gitkeep
+
+# Store
+storage/images/*
+!storage/images/.gitkeep
+
+# Store
+output/*
+!output/.gitkeep
+
 # Logs Traefik
-logs/traefik/*
-!logs/traefik/.gitkeep
+logs/*
+!logs/.gitkeep
 
 # Coverage
 /coverage

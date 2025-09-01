@@ -3,12 +3,8 @@ import path from 'path';
 import fs from 'fs/promises';
 import { generateMD5 } from '@core/helpers/crypto';
 import { logger } from '@core/helpers/logger';
-import { rootPath } from '@core/helpers/fileDirectory';
+import { getRootPath } from '@core/helpers/fileDirectory';
 
-/**
- * @interface ProcessedImageResult
- * @description Define la estructura del resultado de una imagen procesada.
- */
 interface ProcessedImageResult {
   resolution: string;
   path: string;
@@ -16,46 +12,53 @@ interface ProcessedImageResult {
 
 /**
  * @class SharpImageProcessor
- * @description Encapsula la lógica de procesamiento de imágenes utilizando la librería Sharp.
+ * @description Servicio de procesamiento de imágenes que genera variantes en diferentes resoluciones
+ * manteniendo el aspect ratio original. Las imágenes procesadas se almacenan siguiendo
+ * la estructura /output/{nombre_original}/{resolucion}/{md5}.{ext}
  */
 export class SharpImageProcessor {
   private readonly resolutions = [1024, 800];
 
   /**
    * @method process
-   * @description Redimensiona una imagen a las resoluciones predefinidas.
-   * @param {string} originalPath - La ruta al archivo de imagen original.
-   * @returns {Promise<ProcessedImageResult[]>} Una promesa que resuelve a un array con los resultados.
+   * @description Procesa una imagen original generando variantes en las resoluciones definidas.
+   * Cada variante se nombra con el hash MD5 de su contenido para garantizar unicidad.
+   * @param {string} originalPath - Ruta absoluta al archivo de imagen original
+   * @returns {Promise<ProcessedImageResult[]>} Array con información de las variantes generadas
+   * @throws {Error} Si la imagen no puede ser procesada o guardada
    */
   public async process(originalPath: string): Promise<ProcessedImageResult[]> {
     const results: ProcessedImageResult[] = [];
     const ext = path.extname(originalPath);
-    const originalName = path.basename(originalPath, ext);
-    const parts = originalName.split('-');
-    let baseName = originalName;
+    const originalFileName = path.basename(originalPath, ext);
+
+    const parts = originalFileName.split('-');
+    let cleanName = originalFileName;
 
     if (parts.length > 2) {
       const lastPart = parts[parts.length - 1];
       const secondLastPart = parts[parts.length - 2];
 
       if (lastPart.length === 12 && /^\d+$/.test(secondLastPart)) {
-        baseName = parts.slice(0, -2).join('-');
+        cleanName = parts.slice(0, -2).join('-');
       }
     }
 
-    logger.info('Starting image processing', { originalPath, baseName });
+    logger.info('Starting image processing', {
+      originalPath,
+      cleanName,
+    });
 
-    // Extraer el taskId de la ruta original
-    const pathParts = originalPath.split(path.sep);
-    const imagesIndex = pathParts.indexOf('images');
-    const taskId = imagesIndex !== -1 ? pathParts[imagesIndex + 1] : 'default';
+    for (const resolution of this.resolutions) {
+      const outputDir = path.join(getRootPath(), 'output', cleanName, resolution.toString());
 
-    for (const res of this.resolutions) {
-      const outputDir = path.join(rootPath, 'storage', 'images', taskId, 'variants', res.toString());
       await fs.mkdir(outputDir, { recursive: true });
 
       const processedBuffer = await sharp(originalPath)
-        .resize(res)
+        .resize(resolution, null, {
+          withoutEnlargement: true,
+          fit: 'inside',
+        })
         .toBuffer();
 
       const md5Hash = generateMD5(processedBuffer);
@@ -64,14 +67,14 @@ export class SharpImageProcessor {
       await fs.writeFile(outputPath, processedBuffer);
 
       results.push({
-        resolution: res.toString(),
+        resolution: resolution.toString(),
         path: outputPath,
       });
 
-      logger.info(`Generated variant`, {
-        resolution: res,
+      logger.info('Generated variant', {
+        resolution,
         path: outputPath,
-        md5: md5Hash
+        md5: md5Hash,
       });
     }
 
