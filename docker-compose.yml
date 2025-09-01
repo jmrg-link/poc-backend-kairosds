@@ -49,7 +49,7 @@ services:
       - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
       - "--certificatesresolvers.le.acme.httpchallenge=true"
       - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.le.acme.ocspStapling=true"
+      # REMOVIDO: ocspStapling y defaultRuleSyntax causan error en v3.5
       - "--log.level=INFO"
       - "--accesslog=true"
       - "--accesslog.format=json"
@@ -57,7 +57,6 @@ services:
       - "--metrics.prometheus.entryPoint=metrics"
       - "--entrypoints.metrics.address=:8082"
       - "--api.dashboard=true"
-      - "--core.defaultRuleSyntax=v3"
     ports:
       - "80:80"
       - "443:443"
@@ -72,7 +71,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN}`)"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN}`)"  # CORREGIDO
       - "traefik.http.routers.traefik.entrypoints=websecure"
       - "traefik.http.routers.traefik.tls.certresolver=le"
       - "traefik.http.routers.traefik.service=api@internal"
@@ -82,9 +81,6 @@ services:
   # ========= API Service - Clean Architecture + CQRS =========
   api-backend:
     container_name: poc-api-backend
-    # build:
-    #   context: ./image-express-api
-    #   dockerfile: Dockerfile
     image: ${IMAGE_API:-ghcr.io/jmrg-link/poc-backend-kairosds/image-express-api:latest}
     restart: unless-stopped
     ports:
@@ -101,8 +97,8 @@ services:
       QUEUE_NAME: image-processing
       QUEUE_CONCURRENCY: 5
       QUEUE_MAX_RETRIES: 3
-      STORAGE_INPUT_PATH: ${STORAGE_INPUT_PATH:-/home/node/app/storage/images/input}
-      STORAGE_OUTPUT_PATH: ${STORAGE_OUTPUT_PATH:-/home/node/app/output}
+      STORAGE_INPUT_PATH: /home/node/app/storage/images/input
+      STORAGE_OUTPUT_PATH: /home/node/app/output
       API_KEY: ${API_KEY}
       ENABLE_SWAGGER: true
       LOG_LEVEL: info
@@ -110,8 +106,6 @@ services:
       LOKI_BATCH_SIZE: 100
       LOKI_BATCH_INTERVAL: 5000
       APP_VERSION: ${APP_VERSION:-1.0.0}
-    ports:
-      - "3000:3000"
     volumes:
       - ./storage:/home/node/app/storage
       - ./output:/home/node/app/output
@@ -148,9 +142,6 @@ services:
   # ========= Worker Service - Event-Driven Image Processing =========
   worker:
     container_name: poc-worker
-    # build:
-    #   context: ./image-processing-worker
-    #   dockerfile: Dockerfile
     image: ${IMAGE_WORKER:-ghcr.io/jmrg-link/poc-backend-kairosds/image-processing-worker:latest}
     restart: unless-stopped
     environment:
@@ -163,8 +154,8 @@ services:
       QUEUE_NAME: image-processing
       CONCURRENCY: 5
       MAX_RETRIES: 3
-      STORAGE_INPUT_PATH: ${STORAGE_INPUT_PATH:-/app/storage/images/input}
-      STORAGE_OUTPUT_PATH: ${STORAGE_OUTPUT_PATH:-/app/storage/images/output}
+      STORAGE_INPUT_PATH: /home/node/app/storage/images/input
+      STORAGE_OUTPUT_PATH: /home/node/app/output
       LOKI_URL: http://loki:3100
       WORKER_ID: ${WORKER_ID:-worker-1}
       APP_VERSION: ${APP_VERSION:-1.0.0}
@@ -270,7 +261,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.prometheus.rule=Host(`prometheus.${DOMAIN}`)"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.${DOMAIN}`)"  # CORREGIDO
       - "traefik.http.routers.prometheus.entrypoints=websecure"
       - "traefik.http.routers.prometheus.tls.certresolver=le"
       - "traefik.http.routers.prometheus.middlewares=auth"
@@ -305,7 +296,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.grafana.rule=Host(`grafana.${DOMAIN}`)"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.${DOMAIN}`)"  # CORREGIDO
       - "traefik.http.routers.grafana.entrypoints=websecure"
       - "traefik.http.routers.grafana.tls.certresolver=le"
       - "traefik.http.services.grafana.loadbalancer.server.port=3000"
@@ -315,9 +306,6 @@ services:
       timeout: 10s
       retries: 5
 
-# =============================================================================
-# VOLÚMENES PERSISTENTES
-# =============================================================================
 volumes:
   mongodb_data:
   mongodb_config:
@@ -326,9 +314,6 @@ volumes:
   prometheus_data:
   grafana_data:
 
-# =============================================================================
-# REDES
-# =============================================================================
 networks:
   proxy:
     driver: bridge

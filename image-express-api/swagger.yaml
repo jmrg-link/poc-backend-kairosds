@@ -18,7 +18,7 @@ servers:
   description: Servidor de desarrollo local
 - url: http://localhost/api/v1
   description: Servidor Docker local (hostname - docker-compose)
-- url: https://api.poc.jmrg.dev/v1
+- url: https://api.poc.jmrg.dev/api/v1
   description: Servidor de producción (proxy - balancer - Traefik + ssl)
 
 tags:
