@@ -1,29 +1,29 @@
-/**
- * Configuración de Multer para upload de imágenes
- */
 import multer from 'multer';
 import path from 'path';
 import crypto from 'crypto';
 import fs from 'fs';
 import { Request } from 'express';
-import { envs } from '@config/envs';
-import { rootPath } from '@core/helpers/fileDirectory';
+import { getInputStoragePath } from '@core/helpers/fileDirectory';
 
 const VALID_IMAGE_MIMES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'] as const;
 
 /**
- * Configuración de almacenamiento en disco
+ * @description Configuración de almacenamiento en disco para Multer.
+ * Los archivos se guardan temporalmente en el directorio de entrada
+ * antes de ser movidos a su ubicación final por el servicio de tareas.
  */
 const diskStorage = multer.diskStorage({
   destination: function (_req: Request, _file: Express.Multer.File, cb) {
     try {
-      const inputDir = path.join(rootPath, 'storage', 'images', 'input');
+      const inputDir = getInputStoragePath();
+
       if (!fs.existsSync(inputDir)) {
         fs.mkdirSync(inputDir, { recursive: true });
       }
+
       cb(null, inputDir);
     } catch (err) {
-      cb(err as Error, envs.STORAGE.INPUT_PATH);
+      cb(err as Error, getInputStoragePath());
     }
   },
   filename: function (_req: Request, file: Express.Multer.File, cb) {
@@ -36,9 +36,9 @@ const diskStorage = multer.diskStorage({
 });
 
 /**
- * Filtro de archivos para imágenes
- * @param {Request} _req - Request Express
- * @param {Express.Multer.File} file - Archivo subido
+ * @description Filtro para validar que los archivos subidos sean imágenes válidas
+ * @param {Request} _req - Request de Express
+ * @param {Express.Multer.File} file - Archivo siendo validado
  * @param {multer.FileFilterCallback} cb - Callback de validación
  */
 const imageFileFilter = (
@@ -63,7 +63,8 @@ const imageFileFilter = (
 };
 
 /**
- * Configuración para upload en disco
+ * @description Configuración de Multer para almacenamiento en disco.
+ * Limita el tamaño de archivo a 10MB y acepta solo un archivo por petición.
  */
 export const uploadToDisk = multer({
   storage: diskStorage,
@@ -75,7 +76,8 @@ export const uploadToDisk = multer({
 });
 
 /**
- * Configuración para upload en memoria
+ * @description Configuración de Multer para almacenamiento en memoria.
+ * Útil para operaciones que requieren procesar el archivo antes de guardarlo.
  */
 export const uploadToMemory = multer({
   storage: multer.memoryStorage(),
