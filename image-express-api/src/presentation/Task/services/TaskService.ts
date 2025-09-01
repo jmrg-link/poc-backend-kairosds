@@ -2,14 +2,13 @@ import { TaskRepository } from '../repositories';
 import { TaskQueueProducer } from '@infrastructure/queues';
 import { BusinessError, NotFoundError } from '@core/errors';
 import { TaskStatus, TaskStatusTransition, TaskEntity } from '@domain/entities';
-import { TaskResponseDto } from '@domain/dtos';
+import { TaskResponseDto, CreateTaskRequest } from '@domain/dtos';
 import { ImageDownloadService } from '@application/services';
-import { CreateTaskRequest } from '@domain/dtos';
 import { generateUUID } from '@core/helpers/crypto';
 import { logger } from '@core/helpers/logger';
 import fs from 'fs/promises';
 import path from 'path';
-import { rootPath } from '@core/helpers/fileDirectory';
+import { getRootPath } from '@core/helpers/fileDirectory';
 
 /**
  * @interface LogContext
@@ -30,15 +29,20 @@ interface LogContext {
 
 /**
  * @class TaskService
- * @description Orquesta la lógica de negocio para la gestión de tareas.
- * Actúa como intermediario entre el controlador y las capas de datos e infraestructura (repositorios, colas).
+ * @description Servicio principal que orquesta la lógica de negocio para el procesamiento
+ * de imágenes. Gestiona el ciclo de vida completo de las tareas desde su creación
+ * hasta su finalización, coordinando con repositorios, colas y servicios externos.
  */
 export class TaskService {
+  private static readonly MIN_PRICE = 5;
+  private static readonly MAX_PRICE = 50;
+  private static readonly STORAGE_BASE_PATH = path.join(getRootPath(), 'storage', 'images');
+
   /**
    * @constructor
-   * @param {TaskRepository} repository - Repositorio para interactuar con la base de datos de tareas.
-   * @param {TaskQueueProducer} queue - Productor para encolar trabajos de procesamiento.
-   * @param {ImageDownloadService} imageDownloadService - Servicio para descargar imágenes desde URLs.
+   * @param {TaskRepository} repository - Repositorio para persistencia de tareas
+   * @param {TaskQueueProducer} queue - Productor de mensajes para la cola de procesamiento
+   * @param {ImageDownloadService} imageDownloadService - Servicio para descarga de imágenes remotas
    */
   constructor(
     private readonly repository: TaskRepository,
@@ -48,107 +52,50 @@ export class TaskService {
 
   /**
    * @method createTaskFromRequest
-   * @description Orquesta la creación completa de una tarea a partir de una petición HTTP.
-   * Determina el origen de la imagen (subida, URL, ruta local), la procesa,
-   * crea el registro en la base de datos, mueve el archivo original a su ubicación final y encola la tarea.
-   * @param {CreateTaskRequest & { idempotencyKey?: string }} req - La petición HTTP completa.
-   * @returns {Promise<TaskResponseDto>} Un DTO con la información de la tarea creada.
-   * @throws {BusinessError} Si no se proporciona una fuente de imagen válida.
+   * @description Punto de entrada principal para crear una nueva tarea de procesamiento.
+   * Acepta imágenes desde tres fuentes diferentes: upload directo, URL remota o path local.
+   * @param {CreateTaskRequest & { idempotencyKey?: string }} req - Petición con los datos de la imagen
+   * @returns {Promise<TaskResponseDto>} Información de la tarea creada incluyendo ID, estado y precio
+   * @throws {BusinessError} Si no se proporciona ninguna fuente válida de imagen
    */
   async createTaskFromRequest(
     req: CreateTaskRequest & { idempotencyKey?: string }
   ): Promise<TaskResponseDto> {
-    let finalImagePath: string;
-    let source: LogContext['source'];
     const startTime = Date.now();
+    const context: LogContext = { idempotencyKey: req.idempotencyKey };
 
     try {
-      if (req.file) {
-        source = 'upload';
-        finalImagePath = req.file.path;
-        logger.info('Procesando imagen desde upload', {
-          source,
-          filename: req.file.filename,
-          size: req.file.size,
-        });
-      } else if (req.body.imageUrl) {
-        source = 'url';
-        logger.info('Iniciando descarga de imagen', {
-          source,
-          url: req.body.imageUrl,
-        });
-        finalImagePath = await this.imageDownloadService.download(req.body.imageUrl);
-        logger.info('Imagen descargada exitosamente', {
-          source,
-          path: finalImagePath,
-          downloadTime: Date.now() - startTime,
-        });
-      } else if (req.body.imagePath) {
-        source = 'path';
-        finalImagePath = req.body.imagePath;
-        logger.info('Usando imagen desde path local', {
-          source,
-          path: finalImagePath,
+      const { imagePath, source } = await this.resolveImagePath(req);
+      context.source = source;
+
+      const task = await this.createTask(imagePath, req.idempotencyKey);
+      context.taskId = task.taskId;
+      const finalPath = await this.moveImageToTaskDirectory(task.taskId, imagePath);
+
+      if (finalPath !== imagePath) {
+        await this.repository.updateOriginalPath(task.taskId, finalPath);
+        await this.queue.addTask(task.taskId, finalPath);
+        logger.info('Tarea encolada para procesamiento', {
+          taskId: task.taskId,
+          destination: finalPath,
         });
       } else {
-        throw new BusinessError(
-          'Se requiere imagePath, imageUrl o archivo',
-          'MISSING_IMAGE_SOURCE',
-          400
-        );
-      }
-
-      const task = await this.createTask(finalImagePath, req.idempotencyKey);
-      try {
-        const baseImagesDir = path.join(rootPath, 'storage', 'images');
-        const taskDir = path.join(baseImagesDir, task.taskId);
-        await fs.mkdir(taskDir, { recursive: true });
-
-        // Preservar el nombre original del archivo sin los sufijos de Multer
-        const originalFileName = path.basename(finalImagePath);
-        const ext = path.extname(originalFileName);
-        const nameWithoutExt = path.basename(originalFileName, ext);
-
-        const parts = nameWithoutExt.split('-');
-        let cleanName = nameWithoutExt;
-
-        if (parts.length > 2) {
-          const lastPart = parts[parts.length - 1];
-          const secondLastPart = parts[parts.length - 2];
-
-          if (lastPart.length === 12 && /^\d+$/.test(secondLastPart)) {
-            cleanName = parts.slice(0, -2).join('-');
-          }
-        }
-
-        const dest = path.join(taskDir, `${cleanName}${ext}`);
-
-        await fs.rename(finalImagePath, dest);
-        await this.repository.updateOriginalPath(task.taskId, dest);
-        await this.queue.addTask(task.taskId, dest);
-
-        logger.info('Tarea encolada para procesamiento (ruta definitiva)', {
+        await this.queue.addTask(task.taskId, imagePath);
+        logger.info('Tarea encolada con ruta original', {
           taskId: task.taskId,
-          destination: dest,
-        });
-      } catch (moveErr) {
-        logger.error('Error al mover archivo original', {
-          error: moveErr instanceof Error ? moveErr.message : 'unknown',
+          path: imagePath,
         });
       }
 
       logger.info('Tarea creada exitosamente', {
-        taskId: task.taskId,
-        source,
-        idempotencyKey: req.idempotencyKey,
+        ...context,
         processingTime: Date.now() - startTime,
       });
 
       return task;
     } catch (error) {
-      logger.error('Error creando tarea desde request', {
-        source,
-        idempotencyKey: req.idempotencyKey,
+      logger.error('Error creando tarea', {
+        ...context,
         error: error instanceof Error ? error.message : 'Unknown error',
         processingTime: Date.now() - startTime,
       });
@@ -158,44 +105,40 @@ export class TaskService {
 
   /**
    * @method createTask
-   * @description Lógica central para la creación de una tarea en la base de datos.
-   * Maneja la idempotencia y la asignación de un precio aleatorio.
-   * @param {string} imagePath - Ruta temporal de la imagen a procesar.
-   * @param {string} [idempotencyKey] - Clave opcional para garantizar una única ejecución.
-   * @returns {Promise<TaskResponseDto>} El DTO de la tarea creada o existente.
+   * @description Crea una nueva tarea en la base de datos con soporte para idempotencia.
+   * Si existe una tarea con la misma clave de idempotencia, retorna la existente.
+   * @param {string} imagePath - Ruta de la imagen a procesar
+   * @param {string} [idempotencyKey] - Clave única para evitar duplicados
+   * @returns {Promise<TaskResponseDto>} Tarea creada o existente
    */
   async createTask(imagePath: string, idempotencyKey?: string): Promise<TaskResponseDto> {
-    const context: LogContext = {
-      idempotencyKey,
-      imagePath,
-    };
-
     if (idempotencyKey) {
       const existing = await this.repository.findByIdempotencyKey(idempotencyKey);
       if (existing) {
         logger.info('Retornando tarea existente por idempotencia', {
-          ...context,
           taskId: existing._id,
+          idempotencyKey,
+          imagePath,
         });
         return this.mapEntityToDto(existing);
       }
     }
 
-    const price = this.generateRandomPrice();
     const effectiveIdempotencyKey = idempotencyKey ?? generateUUID();
     const task = await this.repository.create({
       status: TaskStatus.PENDING,
-      price,
+      price: this.generateRandomPrice(),
       originalPath: imagePath,
       images: [],
       idempotencyKey: effectiveIdempotencyKey,
     });
 
-    context.taskId = task._id!.toString();
-    logger.info('Tarea creada en BD (pendiente de encolar tras mover original)', {
-      ...context,
-      price,
+    logger.info('Tarea creada en base de datos', {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      taskId: task._id!.toString(),
+      price: task.price,
       status: TaskStatus.PENDING,
+      imagePath,
     });
 
     return this.mapEntityToDto(task);
@@ -203,10 +146,10 @@ export class TaskService {
 
   /**
    * @method getTaskById
-   * @description Busca y devuelve una tarea por su identificador único.
-   * @param {string} taskId - ID de la tarea a buscar.
-   * @returns {Promise<TaskResponseDto>} El DTO de la tarea encontrada.
-   * @throws {NotFoundError} Si no se encuentra ninguna tarea con el ID proporcionado.
+   * @description Obtiene los detalles completos de una tarea específica
+   * @param {string} taskId - Identificador único de la tarea
+   * @returns {Promise<TaskResponseDto>} Información completa de la tarea
+   * @throws {NotFoundError} Si la tarea no existe
    */
   async getTaskById(taskId: string): Promise<TaskResponseDto> {
     const task = await this.repository.findById(taskId);
@@ -226,12 +169,12 @@ export class TaskService {
 
   /**
    * @method listTasks
-   * @description Obtiene una lista paginada de tareas, permitiendo filtrar por estado.
-   * @param {object} options - Opciones de paginación y filtrado.
-   * @param {number} options.page - Número de página a obtener.
-   * @param {number} options.limit - Cantidad de resultados por página.
-   * @param {TaskStatus} [options.status] - Estado opcional para filtrar las tareas.
-   * @returns {Promise<object>} Un objeto con la lista de tareas y la información de paginación.
+   * @description Lista tareas con paginación y filtrado opcional por estado
+   * @param {object} options - Opciones de paginación y filtrado
+   * @param {number} options.page - Número de página (base 1)
+   * @param {number} options.limit - Cantidad de resultados por página
+   * @param {TaskStatus} [options.status] - Filtro opcional por estado
+   * @returns {Promise<object>} Lista paginada de tareas con metadatos
    */
   async listTasks(options: { page: number; limit: number; status?: TaskStatus }): Promise<{
     data: TaskResponseDto[];
@@ -243,11 +186,7 @@ export class TaskService {
     };
   }> {
     const skip = (options.page - 1) * options.limit;
-    const filter: Partial<TaskEntity> = {};
-
-    if (options.status) {
-      filter.status = options.status;
-    }
+    const filter: Partial<TaskEntity> = options.status ? { status: options.status } : {};
 
     const [tasks, total] = await Promise.all([
       this.repository.find(filter, skip, options.limit),
@@ -274,12 +213,11 @@ export class TaskService {
 
   /**
    * @method retryTask
-   * @description Permite reintentar una tarea que se encuentra en estado 'failed'.
-   * Cambia el estado a 'pending' y la vuelve a encolar para su procesamiento.
-   * @param {string} taskId - ID de la tarea a reintentar.
-   * @returns {Promise<TaskResponseDto>} El DTO de la tarea actualizada.
-   * @throws {NotFoundError} Si la tarea no existe.
-   * @throws {BusinessError} Si la tarea no está en estado 'failed'.
+   * @description Reintenta el procesamiento de una tarea fallida
+   * @param {string} taskId - ID de la tarea a reintentar
+   * @returns {Promise<TaskResponseDto>} Tarea actualizada con estado pending
+   * @throws {NotFoundError} Si la tarea no existe
+   * @throws {BusinessError} Si la tarea no está en estado failed
    */
   async retryTask(taskId: string): Promise<TaskResponseDto> {
     const task = await this.repository.findById(taskId);
@@ -301,8 +239,10 @@ export class TaskService {
       );
     }
 
-    await this.repository.updateStatus(taskId, TaskStatus.PENDING);
-    await this.queue.addTask(taskId, task.originalPath);
+    await Promise.all([
+      this.repository.updateStatus(taskId, TaskStatus.PENDING),
+      this.queue.addTask(taskId, task.originalPath),
+    ]);
 
     logger.info('Tarea reintentada', {
       taskId,
@@ -316,13 +256,13 @@ export class TaskService {
 
   /**
    * @method updateTaskStatus
-   * @description Actualiza el estado de una tarea, validando que la transición de estado sea permitida.
-   * @param {string} taskId - ID de la tarea a actualizar.
-   * @param {TaskStatus} newStatus - Nuevo estado para la tarea.
-   * @param {Record<string, unknown>} [data] - Datos adicionales para almacenar junto con la actualización.
+   * @description Actualiza el estado de una tarea validando las transiciones permitidas
+   * @param {string} taskId - ID de la tarea
+   * @param {TaskStatus} newStatus - Nuevo estado
+   * @param {Record<string, unknown>} [data] - Datos adicionales (ej: imágenes procesadas o error)
    * @returns {Promise<void>}
-   * @throws {NotFoundError} Si la tarea no existe.
-   * @throws {Error} Si la transición de estado no es válida según `TaskStatusTransition`.
+   * @throws {NotFoundError} Si la tarea no existe
+   * @throws {Error} Si la transición no es válida
    */
   async updateTaskStatus(
     taskId: string,
@@ -349,12 +289,106 @@ export class TaskService {
 
   /**
    * @private
+   * @method resolveImagePath
+   * @description Determina la fuente de la imagen y obtiene su ruta local
+   * @param {CreateTaskRequest & { idempotencyKey?: string }} req - Petición con datos de imagen
+   * @returns {Promise<{imagePath: string, source: LogContext['source']}>} Ruta y fuente
+   * @throws {BusinessError} Si no hay fuente válida
+   */
+  private async resolveImagePath(
+    req: CreateTaskRequest & { idempotencyKey?: string }
+  ): Promise<{ imagePath: string; source: LogContext['source'] }> {
+    if (req.file) {
+      logger.info('Procesando imagen desde upload', {
+        source: 'upload',
+        filename: req.file.filename,
+        size: req.file.size,
+      });
+      return { imagePath: req.file.path, source: 'upload' };
+    }
+
+    if (req.body.imageUrl) {
+      const startTime = Date.now();
+      logger.info('Iniciando descarga de imagen', {
+        source: 'url',
+        url: req.body.imageUrl,
+      });
+
+      const downloadedPath = await this.imageDownloadService.download(req.body.imageUrl);
+
+      logger.info('Imagen descargada exitosamente', {
+        source: 'url',
+        path: downloadedPath,
+        downloadTime: Date.now() - startTime,
+      });
+
+      return { imagePath: downloadedPath, source: 'url' };
+    }
+
+    if (req.body.imagePath) {
+      logger.info('Usando imagen desde path local', {
+        source: 'path',
+        path: req.body.imagePath,
+      });
+      return { imagePath: req.body.imagePath, source: 'path' };
+    }
+
+    throw new BusinessError(
+      'Se requiere imagePath, imageUrl o archivo',
+      'MISSING_IMAGE_SOURCE',
+      400
+    );
+  }
+
+  /**
+   * @private
+   * @method moveImageToTaskDirectory
+   * @description Mueve la imagen desde el directorio temporal al directorio de la tarea
+   * @param {string} taskId - ID de la tarea
+   * @param {string} sourcePath - Ruta origen
+   * @returns {Promise<string>} Ruta final de la imagen
+   */
+  private async moveImageToTaskDirectory(taskId: string, sourcePath: string): Promise<string> {
+    try {
+      const taskDir = path.join(TaskService.STORAGE_BASE_PATH, taskId);
+      await fs.mkdir(taskDir, { recursive: true });
+
+      const fileName = path.basename(sourcePath);
+      const destPath = path.join(taskDir, fileName);
+
+      try {
+        await fs.access(sourcePath);
+        await fs.rename(sourcePath, destPath);
+        return destPath;
+      } catch (accessError) {
+        logger.warn('Archivo origen no accesible', {
+          taskId,
+          originalPath: sourcePath,
+          error: accessError instanceof Error ? accessError.message : 'unknown',
+        });
+        return sourcePath;
+      }
+    } catch (error) {
+      logger.error('Error al mover archivo', {
+        taskId,
+        sourcePath,
+        error: error instanceof Error ? error.message : 'unknown',
+      });
+      return sourcePath;
+    }
+  }
+
+  /**
+   * @private
    * @method generateRandomPrice
-   * @description Genera un precio aleatorio para una tarea.
-   * @returns {number} Un número entero entre 5 y 50.
+   * @description Genera un precio aleatorio entre 5 y 50 unidades monetarias
+   * @returns {number} Precio entero aleatorio
    */
   private generateRandomPrice(): number {
-    return Math.floor(Math.random() * 46) + 5;
+    return (
+      Math.floor(Math.random() * (TaskService.MAX_PRICE - TaskService.MIN_PRICE + 1)) +
+      TaskService.MIN_PRICE
+    );
   }
 
   /**
@@ -366,12 +400,13 @@ export class TaskService {
    */
   private mapEntityToDto(task: TaskEntity): TaskResponseDto {
     const response: TaskResponseDto = {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       taskId: task._id!.toString(),
       status: task.status as 'pending' | 'processing' | 'completed' | 'failed',
       price: task.price,
     };
 
-    if (task.status === TaskStatus.COMPLETED && task.images && task.images.length > 0) {
+    if (task.status === TaskStatus.COMPLETED && task.images?.length) {
       response.images = task.images;
     }
 
