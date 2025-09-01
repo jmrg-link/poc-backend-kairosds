@@ -98,12 +98,13 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           source: |
             docker-compose.yml
-            deploy/docker-compose.prod.yml
-            config/
-            docker-entrypoint-initdb.d/init-mongo.js
+            deploy/*
+            config/**
+            docker-entrypoint-initdb.d/*.js
           target: ${{ secrets.DEPLOY_PATH }}
-          strip_components: 0
           overwrite: true
+          rm: false
+          strip_components: 0
 
       - name: 🚀 Desplegar (SSH)
         uses: appleboy/ssh-action@v1.0.0
