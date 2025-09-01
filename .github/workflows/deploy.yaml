@@ -89,22 +89,51 @@ jobs:
       - name: ⬇️ Checkout
         uses: actions/checkout@v4
 
-      - name: 📦 Copiar archivos (SCP)
+      # DEBUG: Verificar qué archivos existen después del checkout
+      - name: 🔍 Debug - Verificar archivos
+        run: |
+          echo "=== Directorio actual ==="
+          pwd
+          echo ""
+          echo "=== Archivos en raíz ==="
+          ls -la
+          echo ""
+          echo "=== Verificar archivos específicos ==="
+          test -f docker-compose.yml && echo "✅ docker-compose.yml EXISTE" || echo "❌ docker-compose.yml NO EXISTE"
+          echo ""
+          echo "=== Contenido de deploy/ ==="
+          ls -la deploy/ 2>/dev/null || echo "❌ deploy/ NO EXISTE"
+          echo ""
+          echo "=== Contenido de config/ ==="
+          ls -la config/ 2>/dev/null || echo "❌ config/ NO EXISTE"
+          echo ""
+          echo "=== Contenido de docker-entrypoint-initdb.d/ ==="
+          ls -la docker-entrypoint-initdb.d/ 2>/dev/null || echo "❌ docker-entrypoint-initdb.d/ NO EXISTE"
+
+      # Opción 1: Crear tar manualmente (MÁS CONFIABLE)
+      - name: 📦 Crear archivo tar con los archivos de deploy
+        run: |
+          echo "Creando tar con archivos de configuración..."
+          tar -czf deploy-files.tar.gz \
+            docker-compose.yml \
+            deploy/ \
+            config/ \
+            docker-entrypoint-initdb.d/*.js 2>/dev/null || \
+          tar -czf deploy-files.tar.gz \
+            docker-compose.yml \
+            deploy/ \
+            config/
+          echo "Archivo tar creado: $(ls -lh deploy-files.tar.gz)"
+
+      - name: 📤 Copiar tar al servidor
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
-          source: |
-            docker-compose.yml
-            deploy/*
-            config/**
-            docker-entrypoint-initdb.d/*.js
+          source: "deploy-files.tar.gz"
           target: ${{ secrets.DEPLOY_PATH }}
-          overwrite: true
-          rm: false
-          strip_components: 0
 
       - name: 🚀 Desplegar (SSH)
         uses: appleboy/ssh-action@v1.0.0
@@ -116,6 +145,11 @@ jobs:
           script: |
             set -euo pipefail
             cd "${{ secrets.DEPLOY_PATH }}"
+
+            # Extraer archivos del tar
+            echo "📦 Extrayendo archivos..."
+            tar -xzf deploy-files.tar.gz
+            rm -f deploy-files.tar.gz
 
             # Verificar que existe el archivo .env con las credenciales
             test -f .env || { echo "❌ Falta .env en $PWD"; exit 1; }
