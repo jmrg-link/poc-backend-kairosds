@@ -87,6 +87,8 @@ services:
     #   dockerfile: Dockerfile
     image: ${IMAGE_API:-ghcr.io/jmrg-link/poc-backend-kairosds/image-express-api:latest}
     restart: unless-stopped
+    ports:
+      - "3000:3000"
     environment:
       NODE_ENV: production
       SERVER_PORT: 3000

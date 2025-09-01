@@ -98,7 +98,6 @@ jobs:
     steps:
       - name: ⬇️ Checkout
         uses: actions/checkout@v4
-
       - name: ⏱️ Pre-deploy delay
         run: |
           echo "⏳ Esperando 10 segundos antes del deploy para asegurar disponibilidad..."
@@ -111,11 +110,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
-          source: |
-            docker-compose.yml
-            deploy/docker-compose.prod.yml
-            config/
-            docker-entrypoint-initdb.d/init-mongo.js
+          source: "deploy-files.tar.gz"
           target: ${{ secrets.DEPLOY_PATH }}
 
       - name: 🚀 Desplegar (SSH)
@@ -128,6 +123,11 @@ jobs:
           script: |
             set -euo pipefail
             cd "${{ secrets.DEPLOY_PATH }}"
+
+            # Extraer archivos del tar
+            echo "📦 Extrayendo archivos..."
+            tar -xzf deploy-files.tar.gz
+            rm -f deploy-files.tar.gz
 
             # Verificar que existe el archivo .env con las credenciales
             test -f .env || { echo "❌ Falta .env en $PWD"; exit 1; }
