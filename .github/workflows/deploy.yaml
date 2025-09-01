@@ -98,7 +98,7 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           source: |
             docker-compose.yml
-            deploy/docker-compose.prod.yaml
+            deploy/docker-compose.prod.yml
             config/
             docker-entrypoint-initdb.d/init-mongo.js
           target: ${{ secrets.DEPLOY_PATH }}
