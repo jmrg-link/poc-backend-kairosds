@@ -90,7 +90,7 @@ services:
       NODE_ENV: production
       SERVER_PORT: 3000
       SERVER_API_VERSION: v1
-      MONGODB_URI: mongodb://root:${MONGO_PASSWORD}@mongodb:27017/imagedb?authSource=admin
+      MONGODB_URI: mongodb://{MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/imagedb?authSource=admin
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
@@ -147,7 +147,7 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      MONGODB_URI: mongodb://root:${MONGO_PASSWORD}@mongodb:27017/imagedb?authSource=admin
+      MONGODB_URI: mongodb://{MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/imagedb?authSource=admin
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}

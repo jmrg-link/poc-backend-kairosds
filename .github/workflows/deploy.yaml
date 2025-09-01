@@ -100,7 +100,7 @@ jobs:
             docker-compose.yml
             deploy/docker-compose.prod.yml
             config/
-            scripts/
+            docker-entrypoint-initdb.d/
           target: ${{ secrets.DEPLOY_PATH }}
 
       - name: 🚀 Desplegar (SSH)
