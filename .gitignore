@@ -7,9 +7,6 @@
 /dist
 /node_modules
 
-# Scripts locales
-/docker-entrypoint-initdb.d/init-mongo.js
-
 # Traefik ACME
 /data/traefik/acme/*
 !/data/traefik/acme/.gitkeep
