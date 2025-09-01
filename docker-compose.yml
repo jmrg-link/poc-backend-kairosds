@@ -82,15 +82,16 @@ services:
   # ========= API Service - Clean Architecture + CQRS =========
   api-backend:
     container_name: poc-api-backend
-    build:
-      context: ./image-express-api
-      dockerfile: Dockerfile
+    # build:
+    #   context: ./image-express-api
+    #   dockerfile: Dockerfile
+    image: ${IMAGE_API:-ghcr.io/jmrg-link/poc-backend-kairosds/image-express-api:latest}
     restart: unless-stopped
     environment:
       NODE_ENV: production
       SERVER_PORT: 3000
       SERVER_API_VERSION: v1
-      MONGODB_URI: mongodb://{MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/imagedb?authSource=admin
+      MONGODB_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/imagedb?authSource=admin
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
@@ -98,8 +99,8 @@ services:
       QUEUE_NAME: image-processing
       QUEUE_CONCURRENCY: 5
       QUEUE_MAX_RETRIES: 3
-      STORAGE_INPUT_PATH: /app/storage/images/input
-      STORAGE_OUTPUT_PATH: /app/storage/images/output
+      STORAGE_INPUT_PATH: ${STORAGE_INPUT_PATH:-/home/node/app/storage/images/input}
+      STORAGE_OUTPUT_PATH: ${STORAGE_OUTPUT_PATH:-/home/node/app/output}
       API_KEY: ${API_KEY}
       ENABLE_SWAGGER: true
       LOG_LEVEL: info
@@ -107,8 +108,12 @@ services:
       LOKI_BATCH_SIZE: 100
       LOKI_BATCH_INTERVAL: 5000
       APP_VERSION: ${APP_VERSION:-1.0.0}
+    ports:
+      - "3000:3000"
     volumes:
-      - ./storage:/app/storage
+      - ./storage:/home/node/app/storage
+      - ./output:/home/node/app/output
+      - ./logs:/home/node/app/logs
     depends_on:
       - mongodb
       - redis
@@ -141,13 +146,14 @@ services:
   # ========= Worker Service - Event-Driven Image Processing =========
   worker:
     container_name: poc-worker
-    build:
-      context: ./image-processing-worker
-      dockerfile: Dockerfile
+    # build:
+    #   context: ./image-processing-worker
+    #   dockerfile: Dockerfile
+    image: ${IMAGE_WORKER:-ghcr.io/jmrg-link/poc-backend-kairosds/image-processing-worker:latest}
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      MONGODB_URI: mongodb://{MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/imagedb?authSource=admin
+      MONGODB_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/imagedb?authSource=admin
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
@@ -155,14 +161,16 @@ services:
       QUEUE_NAME: image-processing
       CONCURRENCY: 5
       MAX_RETRIES: 3
-      STORAGE_INPUT_PATH: /app/storage/images/input
-      STORAGE_OUTPUT_PATH: /app/storage/images/output
+      STORAGE_INPUT_PATH: ${STORAGE_INPUT_PATH:-/app/storage/images/input}
+      STORAGE_OUTPUT_PATH: ${STORAGE_OUTPUT_PATH:-/app/storage/images/output}
       LOKI_URL: http://loki:3100
       WORKER_ID: ${WORKER_ID:-worker-1}
       APP_VERSION: ${APP_VERSION:-1.0.0}
       LOG_LEVEL: info
     volumes:
-      - ./storage:/app/storage
+      - ./storage:/home/node/app/storage
+      - ./output:/home/node/app/output
+      - ./logs:/home/node/app/logs
     depends_on:
       - mongodb
       - redis
@@ -182,6 +190,8 @@ services:
       MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
     networks:
       - backend
+    ports:
+      - 27099:27017
     volumes:
       - mongodb_data:/data/db
       - mongodb_config:/data/configdb

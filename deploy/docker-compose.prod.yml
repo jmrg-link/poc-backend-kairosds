@@ -16,6 +16,7 @@ services:
       - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
       - "--certificatesresolvers.le.acme.httpchallenge=true"
       - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.le.acme.ocspStapling=true"  # Añadido OCSP stapling
       - "--log.level=WARN"
       - "--accesslog=true"
       - "--accesslog.format=json"
@@ -30,8 +31,8 @@ services:
     restart: always
     environment:
       NODE_ENV: production
-      LOG_LEVEL: warn
-      ENABLE_SWAGGER: "false"
+      LOG_LEVEL: info
+      ENABLE_SWAGGER: "true"
 
   # ========= Worker - Usar imagen de GHCR =========
   worker:
@@ -39,9 +40,9 @@ services:
     restart: always
     environment:
       NODE_ENV: production
-      LOG_LEVEL: warn
+      LOG_LEVEL: info
 
-  # ========= MongoDB - Optimización producción =========
+  # ========= MongoDB - producción =========
   mongodb:
     restart: always
     command: >
@@ -51,14 +52,20 @@ services:
       --auth
       --oplogSize 2048
       --wiredTigerCacheSizeGB 1
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
 
-  # ========= Redis - Optimización producción =========
+  # ========= Redis - producción =========
   redis:
     restart: always
     command: >
       redis-server
       --maxmemory 768mb
-      --maxmemory-policy allkeys-lru
+      --maxmemory-policy noeviction
       --requirepass ${REDIS_PASSWORD}
       --save 900 1
       --save 300 10
@@ -82,4 +89,4 @@ services:
       GF_SERVER_ROOT_URL: https://grafana.${DOMAIN}
       GF_SECURITY_COOKIE_SECURE: "true"
       GF_SECURITY_COOKIE_SAMESITE: strict
-      GF_LOG_LEVEL: warn
+      GF_LOG_LEVEL: info
