@@ -49,7 +49,6 @@ services:
       - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
       - "--certificatesresolvers.le.acme.httpchallenge=true"
       - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
-      # REMOVIDO: ocspStapling y defaultRuleSyntax causan error en v3.5
       - "--log.level=INFO"
       - "--accesslog=true"
       - "--accesslog.format=json"
@@ -71,7 +70,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.traefik.rule=Host(`traefik.api.${DOMAIN}`)"
+      - "traefik.http.routers.traefik.rule=Host(`api.traefik.${DOMAIN}`)"
       - "traefik.http.routers.traefik.entrypoints=websecure"
       - "traefik.http.routers.traefik.tls.certresolver=le"
       - "traefik.http.routers.traefik.service=api@internal"
@@ -122,8 +121,7 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
       - "traefik.http.routers.api.rule=Host(`api.${DOMAIN}`)"
-      - "traefik.http.routers.api.entrypoints=websecure"
-      - "traefik.http.routers.api.tls.certresolver=le"
+      - "traefik.http.routers.api.entrypoints=web"
       - "traefik.http.services.api.loadbalancer.server.port=3000"
       - "traefik.http.routers.api.middlewares=security,ratelimit,cors"
       - "traefik.http.middlewares.security.headers.stsSeconds=31536000"
@@ -205,6 +203,8 @@ services:
   redis:
     image: redis:7.4-alpine
     container_name: poc-redis
+    ports:
+      - 6379:6379
     restart: unless-stopped
     command: >
       redis-server
@@ -261,7 +261,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.prometheus.rule=Host(`prometheus.api.${DOMAIN}`)"
+      - "traefik.http.routers.prometheus.rule=Host(`api.prometheus.${DOMAIN}`)"
       - "traefik.http.routers.prometheus.entrypoints=websecure"
       - "traefik.http.routers.prometheus.tls.certresolver=le"
       - "traefik.http.routers.prometheus.middlewares=auth"
@@ -296,7 +296,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.grafana.rule=Host(`grafana.api.${DOMAIN}`)"
+      - "traefik.http.routers.grafana.rule=Host(`api.grafana.${DOMAIN}`)"
       - "traefik.http.routers.grafana.entrypoints=websecure"
       - "traefik.http.routers.grafana.tls.certresolver=le"
       - "traefik.http.services.grafana.loadbalancer.server.port=3000"
